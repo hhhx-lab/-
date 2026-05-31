@@ -8,7 +8,9 @@ export default defineNuxtConfig({
       apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000",
       siteUrl: process.env.NUXT_PUBLIC_SITE_URL ?? "http://127.0.0.1:3000",
       appName: "Kuli",
-      enableXiaoku: process.env.NUXT_PUBLIC_ENABLE_XIAOKU !== "false"
+      enableXiaoku: process.env.NUXT_PUBLIC_ENABLE_XIAOKU !== "false",
+      wechatPayQrUrl: process.env.NUXT_PUBLIC_WECHAT_PAY_QR_URL ?? "/pay/wechat-qr.svg",
+      alipayPayQrUrl: process.env.NUXT_PUBLIC_ALIPAY_PAY_QR_URL ?? "/pay/alipay-qr.svg"
     }
   },
   typescript: {

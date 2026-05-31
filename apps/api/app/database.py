@@ -50,8 +50,9 @@ def init_database() -> None:
         _ensure_local_schema_compat(engine)
     elif not _has_required_schema(engine):
         raise RuntimeError("Database schema is missing. Run Alembic migrations before starting the API.")
+    include_demo_data = settings.app_env in {"local", "dev", "development", "test"}
     with SessionLocal() as db:
-        seed_database(db)
+        seed_database(db, include_demo_data=include_demo_data)
 
 
 def get_db() -> Generator[Session, None, None]:

@@ -17,6 +17,22 @@ export function useApi() {
   const config = useRuntimeConfig();
 
   async function request<T>(path: string, options: ApiOptions = {}) {
+    const method = String(options.method ?? "GET").toUpperCase();
+    const maxAttempts = method === "GET" ? 3 : 1;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await sendRequest<T>(path, options);
+      } catch (caught) {
+        lastError = caught;
+        if (!isRetryableError(caught) || attempt === maxAttempts) break;
+        await delay(180 * attempt);
+      }
+    }
+    throw lastError;
+  }
+
+  async function sendRequest<T>(path: string, options: ApiOptions = {}) {
     const headers = new Headers(options.headers);
     headers.set("Content-Type", "application/json");
     if (options.token) headers.set("Authorization", `Bearer ${options.token}`);
@@ -26,6 +42,20 @@ export function useApi() {
       throw new ApiError(body.detail ?? body.error?.message ?? "请求失败", response.status);
     }
     return body as T;
+  }
+
+  function isRetryableStatus(status: number) {
+    return status === 408 || status === 429 || status >= 500;
+  }
+
+  function isRetryableError(error: unknown) {
+    if (error instanceof ApiError) return isRetryableStatus(error.status);
+    if (error instanceof TypeError) return true;
+    return typeof DOMException !== "undefined" && error instanceof DOMException && error.name === "AbortError";
+  }
+
+  function delay(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async function uploadFile(token: string, upload: PresignedUpload, file: File) {

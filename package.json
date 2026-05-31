@@ -22,7 +22,8 @@
     "stack:down": "docker compose -p kuli-order-system down",
     "verify:production-stack": "PYTHONPATH=apps/api uv run --project apps/api python scripts/verify_production_stack.py",
     "db:migrate": "PYTHONPATH=apps/api uv run --project apps/api alembic -c apps/api/alembic.ini upgrade head",
-    "worker": "PYTHONPATH=apps/api uv run --project apps/api celery -A app.tasks.celery_app.celery_app worker --loglevel=INFO"
+    "worker": "PYTHONPATH=apps/api uv run --project apps/api celery -A app.tasks.celery_app.celery_app worker --loglevel=INFO",
+    "load:production": "node scripts/production_load_test.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",

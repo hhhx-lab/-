@@ -413,10 +413,10 @@ class Notification(Base):
     read_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
-def seed_database(db: Session) -> None:
+def seed_database(db: Session, *, include_demo_data: bool = True) -> None:
     from app.services.knowledge import PUBLIC_KNOWLEDGE_ARTICLES, upsert_knowledge_article
 
-    if not db.get(User, "user_admin"):
+    if include_demo_data and not db.get(User, "user_admin"):
         db.add_all(
             [
                 User(
@@ -465,7 +465,7 @@ def seed_database(db: Session) -> None:
         )
     for item in PUBLIC_KNOWLEDGE_ARTICLES:
         upsert_knowledge_article(db, scope=item["scope"], title=item["title"], body=item["body"], tags=item["tags"], source=item["source"])
-    if not db.query(Order).first():
+    if include_demo_data and not db.query(Order).first():
         db.add_all(
             [
                 Order(

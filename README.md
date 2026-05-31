@@ -201,7 +201,23 @@ npm run stack:down
 npm run build
 ```
 
-## Demo 账号
+线上轻量压力测试：
+
+```bash
+LOAD_TEST_URL=https://kuly.com.cn npm run load:production
+```
+
+默认并发为 6、目标 6 RPS、持续 20 秒，会覆盖首页、服务页、文档页、产品页和基础 API。它不是破坏性压测，主要用于上线前确认公网链路没有 5xx、超时或明显抖动。需要更强压力时可逐步调高：
+
+```bash
+LOAD_TEST_URL=https://kuly.com.cn \
+LOAD_TEST_CONCURRENCY=12 \
+LOAD_TEST_TARGET_RPS=12 \
+LOAD_TEST_DURATION_SECONDS=30 \
+npm run load:production
+```
+
+## 本地开发 Demo 账号
 
 | 角色 | 邮箱 | 密码 |
 | --- | --- | --- |
@@ -209,7 +225,15 @@ npm run build
 | 一般账号 | `demo@kuli.local` | `KuliUser123!` |
 | 一般账号 | `other@kuli.local` | `KuliOther123!` |
 
-`demo` 与 `other` 用于验证普通账号只能看到自己的订单；管理员可以看到全部订单和内部字段。
+这些账号只在 `APP_ENV=local/dev/development/test` 时自动写入，用于本地验证普通账号隔离和管理员权限。`APP_ENV=production` 不会自动创建 demo 用户、demo 订单或默认管理员，生产管理员账号需要在服务器上单独初始化并保管凭据。
+
+如果早期生产库已经同步过 demo 数据，可以在服务器应用目录执行：
+
+```bash
+cd /opt/kuly/app
+set -a && . ./.env && set +a
+PYTHONPATH=apps/api uv run --project apps/api python scripts/cleanup_demo_data.py
+```
 
 ## 环境变量
 
@@ -227,6 +251,8 @@ npm run build
 | `NUXT_PUBLIC_SITE_URL` | `http://127.0.0.1:3000` | sitemap、robots、canonical 和 Open Graph 使用的站点地址 | 本地前端地址或正式官网域名 |
 | `NUXT_PUBLIC_APP_NAME` | `Kuli` | 前端展示和元信息中的应用名 | 自己填写 |
 | `NUXT_PUBLIC_ENABLE_XIAOKU` | `true` | 是否显示小酷浮层 | true/false |
+| `NUXT_PUBLIC_WECHAT_PAY_QR_URL` | `/pay/wechat-qr.svg` | 微信收款码图片地址；普通码只支持人工核对，不会自动回调支付状态 | 把真实图片放到 `apps/web/public/pay/wechat-qr.png` 后填 `/pay/wechat-qr.png` |
+| `NUXT_PUBLIC_ALIPAY_PAY_QR_URL` | `/pay/alipay-qr.svg` | 支付宝收款码图片地址；自动识别支付成功需要商户 API | 把真实图片放到 `apps/web/public/pay/alipay-qr.png` 后填 `/pay/alipay-qr.png` |
 | `OBJECT_STORAGE_PROVIDER` | `local` | 对象存储 provider；`local`/`s3`/`r2`/`oss` | 本地用 local；线上按云厂商选择 |
 | `OBJECT_STORAGE_ENDPOINT` | 空 | R2/S3 endpoint；OSS 可填 `https://oss-cn-hangzhou.aliyuncs.com` | 对象存储控制台 |
 | `OBJECT_STORAGE_BUCKET` | `kuli-order-files` | 附件 bucket 名称 | 对象存储控制台创建 |
@@ -257,6 +283,7 @@ npm run build
 | `EMAIL_VERIFY_TOKEN_EXPIRE_MINUTES` | `60` | 邮箱验证链接过期时间 | 自己按安全策略填写 |
 | `PASSWORD_RESET_TOKEN_EXPIRE_MINUTES` | `30` | 密码重置链接过期时间 | 自己按安全策略填写 |
 | `NOTIFICATION_MAX_RETRIES` | `3` | 通知 worker 最大重试次数 | 自己按邮件服务稳定性填写 |
+| `MAX_REQUEST_BODY_BYTES` | `2097152` | API JSON/表单请求体大小上限；附件上传走预签名对象存储，不受此限制 | 一般保持 2MB，特殊需求再调大 |
 
 OSS provider 已支持表单直传 policy 和短期签名下载；正式发布时需要使用生产 bucket、最小权限 access key 和私有读写策略。
 

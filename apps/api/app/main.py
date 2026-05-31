@@ -6,7 +6,7 @@ from urllib.parse import quote, unquote
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -134,6 +134,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def add_security_headers(response: Response) -> Response:
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
+    response.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
+    return response
+
+
+@app.middleware("http")
+async def baseline_security_middleware(request: Request, call_next):  # noqa: ANN001
+    max_request_body_bytes = get_settings().max_request_body_bytes
+    content_length = request.headers.get("content-length")
+    is_local_upload = request.url.path.startswith("/api/uploads/local/")
+    if not is_local_upload and max_request_body_bytes > 0 and content_length:
+        try:
+            too_large = int(content_length) > max_request_body_bytes
+        except ValueError:
+            too_large = False
+        if too_large:
+            return add_security_headers(JSONResponse({"detail": "请求体过大"}, status_code=413))
+
+    response = await call_next(request)
+    return add_security_headers(response)
 
 
 def enqueue_notification_event(event_id: str) -> None:
@@ -455,7 +481,7 @@ def health() -> dict[str, object]:
 
 @app.get("/api/health/deps", response_model=HealthDepsOut)
 def health_deps(db: Session = Depends(get_db)) -> dict[str, object]:
-    return dependency_report(db, settings)
+    return dependency_report(db, get_settings())
 
 
 @app.get("/api/services", response_model=ServicesOut)
@@ -862,7 +888,7 @@ def download_local_upload(object_key: str, expires: int = Query(), signature: st
 @app.post("/api/uploads/local/{object_key:path}", status_code=204)
 async def upload_local_object(object_key: str, request: Request, user: User = Depends(current_user)) -> Response:
     _ = user
-    if settings.object_storage_provider != "local":
+    if get_settings().object_storage_provider != "local":
         raise HTTPException(status_code=404, detail="本地上传仅在 local 存储模式可用")
     body = await request.body()
     if not body:
@@ -1321,7 +1347,7 @@ def assistant_summary(order_number: str, user: User = Depends(current_user), db:
 
 
 def schedule_attachment_analysis(db: Session, attachment_id: str) -> None:
-    if settings.app_env in {"local", "dev", "development", "test"}:
+    if get_settings().app_env in {"local", "dev", "development", "test"}:
         analyze_attachment_sync(db, attachment_id)
     else:
         analyze_attachment.delay(attachment_id)

@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     email_verify_token_expire_minutes: int = 60
     password_reset_token_expire_minutes: int = 30
     notification_max_retries: int = 3
+    max_request_body_bytes: int = 2 * 1024 * 1024
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

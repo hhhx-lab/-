@@ -36,7 +36,7 @@
           <div>
             <span>{{ activeMethod.label }}</span>
             <strong>请备注订单号：{{ order.orderNumber }}</strong>
-            <small>付款码图片是占位图，正式发布前替换为你的真实微信/支付宝收款码。</small>
+            <small>当前版本使用人工收款码，系统不会自动识别到账；付款后请回订单沟通区留言，管理员确认后会更新付款记录。</small>
           </div>
         </div>
       </section>
@@ -63,11 +63,12 @@ import type { Order } from "~/composables/useApi";
 const route = useRoute();
 const auth = useAuthStore();
 const api = useApi();
+const config = useRuntimeConfig();
 const order = ref<Order | null>(null);
 const orderNumber = computed(() => String(route.params.orderNumber));
 const selectedMethod = ref<"wechat" | "alipay">("wechat");
-const wechatMethod = { key: "wechat" as const, label: "微信支付", qr: "/pay/wechat-qr.svg" };
-const alipayMethod = { key: "alipay" as const, label: "支付宝", qr: "/pay/alipay-qr.svg" };
+const wechatMethod = { key: "wechat" as const, label: "微信支付", qr: String(config.public.wechatPayQrUrl) };
+const alipayMethod = { key: "alipay" as const, label: "支付宝", qr: String(config.public.alipayPayQrUrl) };
 const methods = [wechatMethod, alipayMethod];
 const activeMethod = computed(() => (selectedMethod.value === "alipay" ? alipayMethod : wechatMethod));
 const latestQuoteAmount = computed(() => order.value?.quotes.at(-1)?.amount ?? order.value?.quotedPrice ?? 0);

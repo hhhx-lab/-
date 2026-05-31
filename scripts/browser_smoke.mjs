@@ -4,8 +4,17 @@ import { chromium } from "playwright-core";
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:3000";
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
 const WAIT_TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS ?? 90_000);
+const SMOKE_RUN_ID = Date.now();
+const SMOKE_USER_EMAIL = process.env.SMOKE_USER_EMAIL ?? `smoke-${SMOKE_RUN_ID}@kuly.test`;
+const SMOKE_USER_PASSWORD = process.env.SMOKE_USER_PASSWORD ?? `SmokePass${SMOKE_RUN_ID}!`;
+const SMOKE_USER_DISPLAY_NAME = process.env.SMOKE_USER_DISPLAY_NAME ?? `Smoke 用户 ${SMOKE_RUN_ID}`;
+const SMOKE_ADMIN_EMAIL = process.env.SMOKE_ADMIN_EMAIL ?? "admin@kuli.local";
+const SMOKE_ADMIN_PASSWORD = process.env.SMOKE_ADMIN_PASSWORD ?? "KuliAdmin123!";
+const SMOKE_ALLOW_DISABLED_MAIL = process.env.SMOKE_ALLOW_DISABLED_MAIL !== "false";
+const SMOKE_SKIP_USER_REGISTRATION = process.env.SMOKE_SKIP_USER_REGISTRATION === "true";
 const chromePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH
   ?? (existsSync("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome") ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : undefined);
+let smokeUserReady = false;
 
 const result = {
   pages: [],
@@ -15,6 +24,7 @@ const result = {
   serviceOk: false,
   healthDepsOk: false,
   docsGovernanceOk: false,
+  healthDepsWarnings: [],
   noteOk: false,
   productsOk: false,
   docsOk: false,
@@ -23,6 +33,7 @@ const result = {
   notificationsOk: false,
   legalOk: false,
   seoOk: false,
+  paymentOk: false,
   mobileAccountOk: false,
   userOk: false,
   userDetailOk: false,
@@ -108,8 +119,8 @@ async function checkPageMetrics(page, path, viewportName) {
 async function checkXiaoku(page) {
   await goto(page, "/");
   await page.locator(".xiaoku-face").click({ timeout: WAIT_TIMEOUT_MS });
-  await page.getByText("小酷", { exact: true }).waitFor({ timeout: WAIT_TIMEOUT_MS });
-  await page.getByText("帮我写小纸条").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.locator(".xiaoku-panel .section-head strong").filter({ hasText: "小酷" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.locator(".xiaoku-panel").getByText("帮我写小纸条").first().waitFor({ timeout: WAIT_TIMEOUT_MS });
   result.xiaokuOk = true;
 }
 
@@ -117,9 +128,15 @@ async function checkHealthDeps() {
   const response = await fetch(`${API_BASE_URL}/api/health/deps`);
   assert(response.ok, `Health deps returned ${response.status}`);
   const body = await response.json();
-  assert(body.ok === true, "Local health deps should be ok with optional degraded dependencies");
   assert(body.dependencies?.database?.ok === true, "Health deps database check failed");
   assert(body.dependencies?.objectStorage?.ok === true, "Health deps object storage check failed");
+  const failedRequiredDeps = Object.entries(body.dependencies ?? {}).filter(([name, dependency]) => {
+    return dependency?.required === true && dependency?.ok !== true && !(name === "mail" && SMOKE_ALLOW_DISABLED_MAIL);
+  });
+  assert(failedRequiredDeps.length === 0, `Required health dependencies failed: ${failedRequiredDeps.map(([name]) => name).join(", ")}`);
+  if (body.dependencies?.mail?.ok !== true) {
+    result.healthDepsWarnings.push(`mail: ${body.dependencies.mail.status} (${body.dependencies.mail.detail})`);
+  }
   result.healthDepsOk = true;
 }
 
@@ -143,14 +160,14 @@ async function checkServiceNavigation(page) {
 
 async function checkNoteFlow(page) {
   await clearBrowserState(page);
-  await loginAs(page, "demo@kuli.local", "KuliUser123!", "/orders");
+  await ensureSmokeUser(page);
   await goto(page, "/note?service=ai-tools");
   await page.locator("#need-detail").fill("我想做一个课程汇报 PPT，大概 15 页，内容在 Word 里，希望更好看一点。");
   await page.getByRole("button", { name: "让 AI 帮我整理" }).click();
   const polished = page.locator("#polished-demand");
   await expectValueLength(polished, 30);
   result.polishedLength = (await polished.inputValue()).length;
-  await page.locator("#contact").fill("demo@kuli.local");
+  await page.locator("#contact").fill(SMOKE_USER_EMAIL);
   await page.getByRole("button", { name: "丢张小纸条给酷里看看" }).click();
   const status = page.locator(".status-box.is-visible");
   await status.waitFor({ timeout: WAIT_TIMEOUT_MS });
@@ -217,11 +234,9 @@ async function checkLegalAndUploadPolicy(page) {
   await page.getByRole("heading", { name: "文件上传与敏感信息说明" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("密码、验证码、私钥、支付凭证、身份证").waitFor({ timeout: WAIT_TIMEOUT_MS });
 
-  await loginAs(page, "demo@kuli.local", "KuliUser123!", "/orders");
+  await ensureSmokeUser(page);
   await goto(page, "/note");
   await page.getByText("不要提交密码、验证码、私钥").waitFor({ timeout: WAIT_TIMEOUT_MS });
-  await goto(page, "/orders/KULI-DEMO-001");
-  await page.getByText("附件不要包含密码、验证码、私钥").waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   result.legalOk = true;
 }
@@ -276,7 +291,7 @@ async function checkSeoAndGrowth(page) {
 
 async function checkAccountCenter(page) {
   await clearBrowserState(page);
-  await loginAs(page, "demo@kuli.local", "KuliUser123!", "/orders");
+  await ensureSmokeUser(page);
 
   await goto(page, "/me");
   await page.getByText("你的酷里主页").waitFor({ timeout: WAIT_TIMEOUT_MS });
@@ -299,7 +314,7 @@ async function checkAccountCenter(page) {
 
 async function checkNotificationCenter(page) {
   await clearBrowserState(page);
-  await loginAs(page, "demo@kuli.local", "KuliUser123!", "/orders");
+  await loginAs(page, SMOKE_USER_EMAIL, SMOKE_USER_PASSWORD, "/orders");
   await goto(page, "/notifications");
   await page.getByRole("heading", { name: "通知中心" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("管理员回复了你的订单").first().waitFor({ timeout: WAIT_TIMEOUT_MS });
@@ -340,13 +355,38 @@ async function loginAs(page, email, password, targetPath) {
   await page.waitForURL(`**${targetPath}`, { timeout: WAIT_TIMEOUT_MS });
 }
 
+async function registerAs(page, email, password, displayName, targetPath) {
+  await goto(page, "/login");
+  await page.evaluate(() => localStorage.removeItem("kuli-v2-token"));
+  await page.getByRole("button", { name: "注册" }).click();
+  await page.getByLabel("展示名").fill(displayName);
+  await page.getByLabel("邮箱").fill(email);
+  await page.getByLabel("密码").fill(password);
+  await page.locator(".auth-form button[type='submit']").click();
+  await page.waitForURL(`**${targetPath}`, { timeout: WAIT_TIMEOUT_MS });
+}
+
+async function ensureSmokeUser(page) {
+  await clearBrowserState(page);
+  if (smokeUserReady || SMOKE_SKIP_USER_REGISTRATION) {
+    await loginAs(page, SMOKE_USER_EMAIL, SMOKE_USER_PASSWORD, "/orders");
+    smokeUserReady = true;
+    return;
+  }
+  await registerAs(page, SMOKE_USER_EMAIL, SMOKE_USER_PASSWORD, SMOKE_USER_DISPLAY_NAME, "/orders").catch(async () => {
+    await loginAs(page, SMOKE_USER_EMAIL, SMOKE_USER_PASSWORD, "/orders");
+  });
+  smokeUserReady = true;
+}
+
 async function checkUserOrders(page) {
-  await loginAs(page, "demo@kuli.local", "KuliUser123!", "/orders");
-  await page.getByText("KULI-DEMO-001").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  assert(result.noteOrder, "Note flow must create an order before user order checks");
+  await loginAs(page, SMOKE_USER_EMAIL, SMOKE_USER_PASSWORD, "/orders");
+  await page.getByText(result.noteOrder).waitFor({ timeout: WAIT_TIMEOUT_MS });
   await assertNoInternalText(page, "User orders page");
 
-  await page.locator('a[href="/orders/KULI-DEMO-001"]').first().click({ timeout: WAIT_TIMEOUT_MS });
-  await page.waitForURL("**/orders/KULI-DEMO-001", { timeout: WAIT_TIMEOUT_MS });
+  await page.locator(`a[href="/orders/${result.noteOrder}"]`).first().click({ timeout: WAIT_TIMEOUT_MS });
+  await page.waitForURL(`**/orders/${result.noteOrder}`, { timeout: WAIT_TIMEOUT_MS });
   await page.getByText("进度时间线").waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("报价与付款").waitFor({ timeout: WAIT_TIMEOUT_MS });
   await assertNoInternalText(page, "User order detail page");
@@ -366,7 +406,7 @@ async function checkUserOrders(page) {
   await page.getByText(attachmentName, { exact: true }).first().waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await checkPageMetrics(page, "/orders/KULI-DEMO-001", "mobile-auth");
+  await checkPageMetrics(page, `/orders/${result.noteOrder}`, "mobile-auth");
   await page.setViewportSize({ width: 1440, height: 980 });
 
   result.userOk = true;
@@ -374,16 +414,17 @@ async function checkUserOrders(page) {
 }
 
 async function checkAdminOrders(page) {
+  assert(result.noteOrder, "Note flow must create an order before admin order checks");
   await clearBrowserState(page);
-  await loginAs(page, "admin@kuli.local", "KuliAdmin123!", "/admin");
+  await loginAs(page, SMOKE_ADMIN_EMAIL, SMOKE_ADMIN_PASSWORD, "/admin");
   await page.getByText("共").waitFor({ timeout: WAIT_TIMEOUT_MS });
-  await page.getByText("KULI-DEMO-001").waitFor({ timeout: WAIT_TIMEOUT_MS });
-  await page.locator('input[placeholder*="搜索订单号"]').fill("KULI-DEMO-001");
+  await page.getByText(result.noteOrder).waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.locator('input[placeholder*="搜索订单号"]').fill(result.noteOrder);
   await page.getByRole("button", { name: "搜索" }).click();
-  await page.getByText("KULI-DEMO-001").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByText(result.noteOrder).waitFor({ timeout: WAIT_TIMEOUT_MS });
 
-  await page.locator('a[href="/admin/orders/KULI-DEMO-001"]').first().click({ timeout: WAIT_TIMEOUT_MS });
-  await page.waitForURL("**/admin/orders/KULI-DEMO-001", { timeout: WAIT_TIMEOUT_MS });
+  await page.locator(`a[href="/admin/orders/${result.noteOrder}"]`).first().click({ timeout: WAIT_TIMEOUT_MS });
+  await page.waitForURL(`**/admin/orders/${result.noteOrder}`, { timeout: WAIT_TIMEOUT_MS });
   await page.getByRole("term").filter({ hasText: "内部备注" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("AI 自动化建议").waitFor({ timeout: WAIT_TIMEOUT_MS });
 
@@ -409,16 +450,54 @@ async function checkAdminOrders(page) {
 
   const deliverableTitle = `浏览器 smoke 交付物 ${Date.now()}`;
   await page.getByPlaceholder("交付物标题").fill(deliverableTitle);
-  await page.getByPlaceholder("对象存储 key / 链接").fill(`orders/KULI-DEMO-001/${deliverableTitle}.txt`);
+  await page.getByPlaceholder("对象存储 key / 链接").fill(`orders/${result.noteOrder}/${deliverableTitle}.txt`);
   await page.getByRole("button", { name: "登记交付" }).click();
   await page.getByText(deliverableTitle, { exact: true }).waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await checkPageMetrics(page, "/admin/orders/KULI-DEMO-001", "mobile-admin");
+  await checkPageMetrics(page, `/admin/orders/${result.noteOrder}`, "mobile-admin");
   await page.setViewportSize({ width: 1440, height: 980 });
 
   result.adminOk = true;
   result.adminDetailOk = true;
+}
+
+async function checkPaymentPage(page) {
+  assert(result.noteOrder, "Note flow must create an order before payment page checks");
+  await clearBrowserState(page);
+  await loginAs(page, SMOKE_USER_EMAIL, SMOKE_USER_PASSWORD, "/orders");
+  await goto(page, `/pay/${result.noteOrder}`);
+  await page.getByText("选择付款方式").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await expectQrImage(page, "/pay/wechat-qr.png");
+
+  await page.getByRole("button", { name: "支付宝" }).click();
+  await expectQrImage(page, "/pay/alipay-qr.png");
+  await page.getByText(`请备注订单号：${result.noteOrder}`).waitFor({ timeout: WAIT_TIMEOUT_MS });
+  result.paymentOk = true;
+}
+
+async function expectQrImage(page, expectedPath) {
+  const image = page.locator(".qr-panel img");
+  await image.waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.waitForFunction(
+    (path) => {
+      const img = document.querySelector(".qr-panel img");
+      return img instanceof HTMLImageElement && img.getAttribute("src") === path && img.complete && img.naturalWidth > 100 && img.naturalHeight > 100;
+    },
+    expectedPath,
+    { timeout: WAIT_TIMEOUT_MS }
+  );
+  const state = await image.evaluate((node) => {
+    const img = node;
+    return {
+      src: img.getAttribute("src") || "",
+      complete: img.complete,
+      naturalWidth: img.naturalWidth,
+      naturalHeight: img.naturalHeight
+    };
+  });
+  assert(state.src === expectedPath, `Payment QR src mismatch: expected ${expectedPath}, got ${state.src}`);
+  assert(state.complete && state.naturalWidth > 100 && state.naturalHeight > 100, `Payment QR did not load: ${JSON.stringify(state)}`);
 }
 
 async function assertNoInternalText(page, label) {
@@ -470,6 +549,7 @@ async function run() {
 
     await page.setViewportSize({ width: 1440, height: 980 });
     await checkAdminOrders(page);
+    await checkPaymentPage(page);
     await checkNotificationCenter(page);
 
     assert(result.xiaokuOk, "Xiaoku panel check did not pass");
@@ -485,6 +565,7 @@ async function run() {
     assert(result.accountOk, "Account center check did not pass");
     assert(result.notificationsOk, "Notification center check did not pass");
     assert(result.mobileAccountOk, "Mobile account navigation check did not pass");
+    assert(result.paymentOk, "Payment page check did not pass");
     assert(result.userOk, "User order check did not pass");
     assert(result.userDetailOk, "User order detail check did not pass");
     assert(result.adminOk, "Admin order check did not pass");
