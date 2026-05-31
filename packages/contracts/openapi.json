@@ -538,10 +538,32 @@
       },
       "AgentSessionInput": {
         "properties": {
+          "docSlug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docslug"
+          },
           "pagePath": {
             "default": "/",
             "title": "Pagepath",
             "type": "string"
+          },
+          "serviceSlug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serviceslug"
           },
           "visitorId": {
             "anyOf": [
@@ -560,6 +582,17 @@
       },
       "AgentSessionOut": {
         "properties": {
+          "docSlug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Docslug"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -567,6 +600,17 @@
           "pagePath": {
             "title": "Pagepath",
             "type": "string"
+          },
+          "serviceSlug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serviceslug"
           },
           "userId": {
             "anyOf": [
@@ -583,6 +627,8 @@
         "required": [
           "id",
           "pagePath",
+          "docSlug",
+          "serviceSlug",
           "userId"
         ],
         "title": "AgentSessionOut",

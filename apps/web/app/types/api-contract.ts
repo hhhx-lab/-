@@ -21,9 +21,9 @@ export type AgentDraftOut = { serviceSlug: string; summary: string; missingField
 
 export type AgentSessionEnvelope = { session: AgentSessionOut };
 
-export type AgentSessionInput = { visitorId?: string | null; pagePath?: string };
+export type AgentSessionInput = { visitorId?: string | null; pagePath?: string; docSlug?: string | null; serviceSlug?: string | null };
 
-export type AgentSessionOut = { id: string; pagePath: string; userId: string | null };
+export type AgentSessionOut = { id: string; pagePath: string; docSlug: string | null; serviceSlug: string | null; userId: string | null };
 
 export type AssistantSummaryContentOut = { orderNumber: string; status: string; nextAction: string; publicNotes: string };
 

@@ -156,7 +156,7 @@ export function useApi() {
         method: "POST",
         token
       }),
-    createAgentSession: (input: { pagePath: string; visitorId?: string }, token?: string | null) =>
+    createAgentSession: (input: { pagePath: string; visitorId?: string; docSlug?: string; serviceSlug?: string }, token?: string | null) =>
       request<ApiResponse<"/api/agent/sessions", "post">>("/api/agent/sessions", { method: "POST", token, body: JSON.stringify(input) }),
     chat: (input: { sessionId: string; message: string }, token?: string | null) =>
       request<ApiResponse<"/api/agent/chat", "post">>("/api/agent/chat", { method: "POST", token, body: JSON.stringify(input) })

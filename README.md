@@ -253,6 +253,7 @@ npm run build
 | `MAIL_FROM` / `MAIL_REPLY_TO` | 空 | 发件人和回复地址 | 邮件服务商配置 |
 | `SMTP_HOST` / `SMTP_PORT` | 空 / `587` | SMTP 连接配置 | 邮件服务商后台 |
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | 空 | SMTP 凭据 | 邮件服务商后台 |
+| `SMTP_TIMEOUT_SECONDS` | `20` | SMTP 连接和发送超时时间 | 一般保持默认，网络慢时调大 |
 | `EMAIL_VERIFY_TOKEN_EXPIRE_MINUTES` | `60` | 邮箱验证链接过期时间 | 自己按安全策略填写 |
 | `PASSWORD_RESET_TOKEN_EXPIRE_MINUTES` | `30` | 密码重置链接过期时间 | 自己按安全策略填写 |
 | `NOTIFICATION_MAX_RETRIES` | `3` | 通知 worker 最大重试次数 | 自己按邮件服务稳定性填写 |

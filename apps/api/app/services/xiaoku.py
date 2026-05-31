@@ -29,8 +29,21 @@ SERVICE_KEYWORDS = [
 ]
 
 
-def create_session(db: Session, user: User | None, visitor_id: str | None, page_path: str) -> AgentSession:
-    session = AgentSession(user_id=user.id if user else None, visitor_id=visitor_id, page_path=page_path)
+def create_session(
+    db: Session,
+    user: User | None,
+    visitor_id: str | None,
+    page_path: str,
+    doc_slug: str | None = None,
+    service_slug: str | None = None,
+) -> AgentSession:
+    session = AgentSession(
+        user_id=user.id if user else None,
+        visitor_id=visitor_id,
+        page_path=page_path,
+        doc_slug=doc_slug,
+        service_slug=service_slug,
+    )
     db.add(session)
     db.commit()
     db.refresh(session)
@@ -39,13 +52,14 @@ def create_session(db: Session, user: User | None, visitor_id: str | None, page_
 
 def chat(db: Session, session: AgentSession, message: str, user: User | None) -> dict[str, object]:
     db.add(AgentMessage(session_id=session.id, role="user", content=message))
-    answer = answer_message(db, message, user)
+    answer = answer_message(db, session, message, user)
     db.add(AgentMessage(session_id=session.id, role="assistant", content=answer["answer"], actions_json=json.dumps(answer["actions"], ensure_ascii=False)))
     db.commit()
     return answer
 
 
-def answer_message(db: Session, message: str, user: User | None) -> dict[str, object]:
+def answer_message(db: Session, session: AgentSession, message: str, user: User | None) -> dict[str, object]:
+    context_query = " ".join(item for item in [message, session.page_path, session.doc_slug or "", session.service_slug or ""] if item)
     if _has_any(message, SENSITIVE_TERMS):
         citations = _citations_for_query(db, "哪些信息不要发 密码 验证码 敏感信息", fallback=[{"title": "常见问题", "to": "/help/faq#sensitive-info", "source": "doc:faq"}])
         return {
@@ -82,14 +96,14 @@ def answer_message(db: Session, message: str, user: User | None) -> dict[str, ob
             }
     if "收费" in message or "价格" in message or "钱" in message:
         text = "可以先免费判断能不能做。具体报价需要看材料、范围、周期和风险，小酷不会替管理员直接承诺价格。"
-        hits = search_knowledge_hits(db, "收费 价格 定金 报价", limit=5)
+        hits = search_knowledge_hits(db, f"{context_query} 收费 价格 定金 报价", limit=5)
     elif "材料" in message or "上传" in message:
         text = "你可以先准备截图、源文件、目标效果、截止时间和预算区间。说不清也没关系，先写小纸条。"
-        hits = search_knowledge_hits(db, "材料 上传 截图 源文件", limit=5)
+        hits = search_knowledge_hits(db, f"{context_query} 材料 上传 截图 源文件", limit=5)
     else:
-        hits = search_knowledge_hits(db, message, limit=5)
+        hits = search_knowledge_hits(db, context_query, limit=5)
         articles = [hit.article for hit in hits]
-        text = answer_from_knowledge(message, articles, hits)
+        text = answer_from_knowledge(message, articles, hits, session)
     return {
         "answer": text,
         "actions": _actions_for_message(message),
@@ -98,12 +112,13 @@ def answer_message(db: Session, message: str, user: User | None) -> dict[str, ob
     }
 
 
-def answer_from_knowledge(message: str, articles: list[KnowledgeArticle], hits: list[KnowledgeHit]) -> str:
+def answer_from_knowledge(message: str, articles: list[KnowledgeArticle], hits: list[KnowledgeHit], session: AgentSession) -> str:
     context = "\n\n".join(f"【{hit.article.title} / {hit.chunk.section}】\n{hit.chunk.content}" for hit in hits[:5])
+    session_context = _session_context(session)
     remote = complete_chat(
         system=XIAOKU_SYSTEM_PROMPT,
         messages=[
-            {"role": "user", "content": f"知识库：\n{context or '暂无匹配知识'}\n\n用户问题：{message}"},
+            {"role": "user", "content": f"当前页面上下文：{session_context}\n\n知识库：\n{context or '暂无匹配知识'}\n\n用户问题：{message}"},
         ],
     )
     if remote:
@@ -113,6 +128,15 @@ def answer_from_knowledge(message: str, articles: list[KnowledgeArticle], hits: 
         summary = _compact_body(first.body)
         return f"小酷按知识库看，{summary} 你可以先把已有材料和想要的结果写成小纸条，我会帮你继续拆。"
     return "我是小酷。你可以直接说卡在哪里，我会帮你判断属于哪类服务，并引导你写小纸条。"
+
+
+def _session_context(session: AgentSession) -> str:
+    parts = [f"pagePath={session.page_path}"]
+    if session.doc_slug:
+        parts.append(f"docSlug={session.doc_slug}")
+    if session.service_slug:
+        parts.append(f"serviceSlug={session.service_slug}")
+    return "；".join(parts)
 
 
 def _has_any(message: str, terms: list[str]) -> bool:

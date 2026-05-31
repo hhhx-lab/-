@@ -81,6 +81,14 @@
           </article>
         </div>
         <p v-else>还没有报价或付款记录。</p>
+        <div v-if="payableAmount > 0" class="payment-callout">
+          <div>
+            <span>待人工确认付款</span>
+            <strong>¥{{ payableAmount }}</strong>
+            <small>扫码付款后管理员会核对到账，再更新订单付款记录。</small>
+          </div>
+          <NuxtLink class="button" :to="`/pay/${order.orderNumber}`">去付款</NuxtLink>
+        </div>
       </section>
 
       <section class="info-card">
@@ -113,6 +121,14 @@ const selectedFile = ref<File | null>(null);
 const messageBody = ref("");
 const orderNumber = computed(() => String(route.params.orderNumber));
 const canAccept = computed(() => order.value?.status === "review");
+const payableAmount = computed(() => {
+  if (!order.value) return 0;
+  const latestQuoteAmount = order.value.quotes.at(-1)?.amount ?? order.value.quotedPrice ?? 0;
+  const received = order.value.payments
+    .filter((payment) => payment.status === "received")
+    .reduce((total, payment) => total + payment.amount, 0);
+  return Math.max(0, latestQuoteAmount - received);
+});
 
 onMounted(async () => {
   await auth.restore();

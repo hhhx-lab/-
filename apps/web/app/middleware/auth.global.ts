@@ -1,6 +1,6 @@
 export default defineNuxtRouteMiddleware(async (to) => {
   const path = to.path;
-  const protectedPrefixes = ["/note", "/orders", "/me", "/settings", "/referrals", "/notifications"];
+  const protectedPrefixes = ["/note", "/orders", "/pay", "/me", "/settings", "/referrals", "/notifications"];
   const isProtected = protectedPrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
   const isAdmin = path === "/admin" || path.startsWith("/admin/");
   const auth = useAuthStore();

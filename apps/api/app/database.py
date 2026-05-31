@@ -129,3 +129,11 @@ def _ensure_local_schema_compat(active_engine: Engine) -> None:
             }.items():
                 if name not in columns:
                     connection.exec_driver_sql(f"ALTER TABLE notification_events ADD COLUMN {name} {ddl}")
+        if inspector.has_table("agent_sessions"):
+            columns = {column["name"] for column in inspector.get_columns("agent_sessions")}
+            for name, ddl in {
+                "doc_slug": "VARCHAR(120)",
+                "service_slug": "VARCHAR(120)",
+            }.items():
+                if name not in columns:
+                    connection.exec_driver_sql(f"ALTER TABLE agent_sessions ADD COLUMN {name} {ddl}")

@@ -271,6 +271,8 @@ class AgentSession(Base):
     user_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("users.id"), nullable=True)
     visitor_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     page_path: Mapped[str] = mapped_column(String(255), default="/")
+    doc_slug: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    service_slug: Mapped[str | None] = mapped_column(String(120), nullable=True)
     created_at: Mapped[str] = mapped_column(String(64), default=now_iso)
     updated_at: Mapped[str] = mapped_column(String(64), default=now_iso)
 

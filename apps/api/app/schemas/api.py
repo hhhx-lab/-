@@ -469,6 +469,8 @@ class DeliverableInput(BaseModel):
 class AgentSessionInput(BaseModel):
     visitorId: str | None = None
     pagePath: str = "/"
+    docSlug: str | None = None
+    serviceSlug: str | None = None
 
 
 class AgentChatInput(BaseModel):
@@ -479,6 +481,8 @@ class AgentChatInput(BaseModel):
 class AgentSessionOut(BaseModel):
     id: str
     pagePath: str
+    docSlug: str | None
+    serviceSlug: str | None
     userId: str | None
 
 

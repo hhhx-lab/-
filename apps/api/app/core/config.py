@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_username: str = ""
     smtp_password: str = ""
+    smtp_timeout_seconds: int = 20
     email_verify_token_expire_minutes: int = 60
     password_reset_token_expire_minutes: int = 30
     notification_max_retries: int = 3

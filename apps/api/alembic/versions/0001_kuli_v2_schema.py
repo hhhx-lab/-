@@ -118,6 +118,8 @@ def upgrade() -> None:
         sa.Column("user_id", sa.String(length=64), nullable=True),
         sa.Column("visitor_id", sa.String(length=120), nullable=True),
         sa.Column("page_path", sa.String(length=255), nullable=False),
+        sa.Column("doc_slug", sa.String(length=120), nullable=True),
+        sa.Column("service_slug", sa.String(length=120), nullable=True),
         sa.Column("created_at", sa.String(length=64), nullable=False),
         sa.Column("updated_at", sa.String(length=64), nullable=False),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),

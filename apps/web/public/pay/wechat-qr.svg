@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="0 0 360 360" role="img" aria-labelledby="title desc">
+  <title id="title">微信支付收款码占位图</title>
+  <desc id="desc">正式发布前替换为真实微信收款码图片。</desc>
+  <rect width="360" height="360" fill="#f6fff8"/>
+  <rect x="22" y="22" width="316" height="316" rx="24" fill="#ffffff" stroke="#19a45b" stroke-width="10"/>
+  <g fill="#111111">
+    <rect x="54" y="54" width="80" height="80" rx="8"/>
+    <rect x="70" y="70" width="48" height="48" rx="4" fill="#ffffff"/>
+    <rect x="226" y="54" width="80" height="80" rx="8"/>
+    <rect x="242" y="70" width="48" height="48" rx="4" fill="#ffffff"/>
+    <rect x="54" y="226" width="80" height="80" rx="8"/>
+    <rect x="70" y="242" width="48" height="48" rx="4" fill="#ffffff"/>
+    <rect x="160" y="58" width="18" height="52"/>
+    <rect x="184" y="58" width="40" height="18"/>
+    <rect x="154" y="136" width="52" height="18"/>
+    <rect x="232" y="150" width="18" height="56"/>
+    <rect x="270" y="152" width="34" height="18"/>
+    <rect x="154" y="184" width="18" height="54"/>
+    <rect x="184" y="184" width="46" height="18"/>
+    <rect x="184" y="220" width="18" height="44"/>
+    <rect x="220" y="226" width="86" height="18"/>
+    <rect x="220" y="262" width="18" height="44"/>
+    <rect x="256" y="262" width="50" height="18"/>
+    <rect x="288" y="288" width="18" height="18"/>
+  </g>
+  <circle cx="180" cy="180" r="34" fill="#19a45b"/>
+  <text x="180" y="188" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#ffffff">微信</text>
+  <text x="180" y="334" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" fill="#137a45">PLACEHOLDER QR</text>
+</svg>

@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy import text
 
 from app import database
+from app.core.config import get_settings
 from app.database import configure_database, init_database
 from app.main import app
 
@@ -35,7 +36,7 @@ def notification_events(order_number: str) -> list[dict[str, object]]:
         rows = db.execute(
             text(
                 """
-                select id, order_number, channel, recipient, subject, body, status, retry_count, last_error
+                select id, event_type, order_number, channel, recipient, subject, body, status, retry_count, last_error
                 from notification_events
                 where order_number = :order_number
                 order by created_at asc
@@ -44,6 +45,13 @@ def notification_events(order_number: str) -> list[dict[str, object]]:
             {"order_number": order_number},
         ).mappings()
         return [dict(row) for row in rows]
+
+
+def user_referral_code(email: str) -> str:
+    with database.SessionLocal() as db:
+        row = db.execute(text("select referral_code from users where email = :email"), {"email": email}).mappings().first()
+        assert row
+        return str(row["referral_code"])
 
 
 @pytest.mark.anyio
@@ -158,3 +166,170 @@ async def test_mail_worker_failure_keeps_in_app_notification_visible(client: htt
     assert listing.status_code == 200
     assert listing.json()["notifications"][0]["status"] == "unread"
     assert "邮件失败" in listing.json()["notifications"][0]["body"]
+
+
+@pytest.mark.anyio
+async def test_smtp_mail_provider_sends_email_message(client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.tasks.notification_tasks import send_notification_event_sync
+
+    sent_clients: list[object] = []
+
+    class FakeSMTP:
+        def __init__(self, host: str, port: int, timeout: int) -> None:
+            self.host = host
+            self.port = port
+            self.timeout = timeout
+            self.started_tls = False
+            self.login_args: tuple[str, str] | None = None
+            self.message = None
+            sent_clients.append(self)
+
+        def __enter__(self) -> "FakeSMTP":
+            return self
+
+        def __exit__(self, exc_type, exc, traceback) -> None:  # noqa: ANN001
+            return None
+
+        def starttls(self) -> None:
+            self.started_tls = True
+
+        def login(self, username: str, password: str) -> None:
+            self.login_args = (username, password)
+
+        def send_message(self, message) -> None:  # noqa: ANN001
+            self.message = message
+
+    monkeypatch.setenv("MAIL_PROVIDER", "smtp")
+    monkeypatch.setenv("MAIL_FROM", "no-reply@kuli.test")
+    monkeypatch.setenv("MAIL_REPLY_TO", "support@kuli.test")
+    monkeypatch.setenv("SMTP_HOST", "smtp.kuli.test")
+    monkeypatch.setenv("SMTP_PORT", "587")
+    monkeypatch.setenv("SMTP_USERNAME", "smtp-user")
+    monkeypatch.setenv("SMTP_PASSWORD", "smtp-password")
+    get_settings.cache_clear()
+    monkeypatch.setattr("smtplib.SMTP", FakeSMTP)
+
+    admin_token = await login(client, "admin@kuli.local", "KuliAdmin123!")
+    reply = await client.post(
+        "/api/admin/orders/KULI-DEMO-001/messages",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"body": "SMTP 应该真正发送这条邮件。", "visibility": "public"},
+    )
+    assert reply.status_code == 201
+    event_id = str(notification_events("KULI-DEMO-001")[0]["id"])
+
+    try:
+        status = send_notification_event_sync(event_id)
+    finally:
+        get_settings.cache_clear()
+
+    assert status == "sent"
+    assert len(sent_clients) == 1
+    client_instance = sent_clients[0]
+    assert client_instance.host == "smtp.kuli.test"
+    assert client_instance.port == 587
+    assert client_instance.timeout == 20
+    assert client_instance.started_tls is True
+    assert client_instance.login_args == ("smtp-user", "smtp-password")
+    assert client_instance.message["From"] == "no-reply@kuli.test"
+    assert client_instance.message["To"] == "demo@kuli.local"
+    assert client_instance.message["Reply-To"] == "support@kuli.test"
+    assert "管理员回复" in client_instance.message["Subject"]
+    assert "SMTP 应该真正发送这条邮件" in client_instance.message.get_content()
+
+
+@pytest.mark.anyio
+async def test_configured_mail_provider_enqueues_public_reply_email_event(client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    from app import main as app_main
+
+    queued_event_ids: list[str] = []
+
+    class FakeNotificationTask:
+        def delay(self, event_id: str) -> None:
+            queued_event_ids.append(event_id)
+
+    monkeypatch.setenv("MAIL_PROVIDER", "smtp")
+    get_settings.cache_clear()
+    monkeypatch.setattr(app_main, "send_notification_event", FakeNotificationTask(), raising=False)
+
+    admin_token = await login(client, "admin@kuli.local", "KuliAdmin123!")
+    try:
+        reply = await client.post(
+            "/api/admin/orders/KULI-DEMO-001/messages",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={"body": "配置邮件后，公开回复要入队发送。", "visibility": "public"},
+        )
+    finally:
+        get_settings.cache_clear()
+
+    assert reply.status_code == 201
+    events = notification_events("KULI-DEMO-001")
+    assert len(events) == 1
+    assert queued_event_ids == [events[0]["id"]]
+
+
+@pytest.mark.anyio
+async def test_order_lifecycle_and_referral_actions_create_notifications(client: httpx.AsyncClient) -> None:
+    admin_token = await login(client, "admin@kuli.local", "KuliAdmin123!")
+    demo_token = await login(client, "demo@kuli.local", "KuliUser123!")
+
+    patch = await client.patch(
+        "/api/admin/orders/KULI-DEMO-001",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"status": "clarifying", "publicNotes": "请补充一张参考截图。"},
+    )
+    assert patch.status_code == 200
+
+    quote = await client.post(
+        "/api/admin/orders/KULI-DEMO-001/quotes",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"amount": 120, "kind": "deposit", "note": "先收定金，确认材料后开工。"},
+    )
+    assert quote.status_code == 201
+
+    payment = await client.post(
+        "/api/admin/orders/KULI-DEMO-001/payments",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"amount": 60, "kind": "deposit", "method": "微信收款码", "status": "received", "note": "已确认到账"},
+    )
+    assert payment.status_code == 201
+
+    deliverable = await client.post(
+        "/api/admin/orders/KULI-DEMO-001/deliverables",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"title": "第一版交付", "description": "请先验收第一版。", "storageKey": "deliverables/KULI-DEMO-001/v1.zip"},
+    )
+    assert deliverable.status_code == 201
+
+    accepted = await client.post("/api/orders/KULI-DEMO-001/accept", headers={"Authorization": f"Bearer {demo_token}"})
+    assert accepted.status_code == 200
+
+    customer_notifications = await client.get("/api/notifications", headers={"Authorization": f"Bearer {demo_token}"})
+    assert customer_notifications.status_code == 200
+    customer_types = {item["type"] for item in customer_notifications.json()["notifications"]}
+    assert {"order_status_changed", "quote_created", "payment_recorded", "deliverable_uploaded"}.issubset(customer_types)
+
+    admin_notifications = await client.get("/api/notifications", headers={"Authorization": f"Bearer {admin_token}"})
+    assert admin_notifications.status_code == 200
+    admin_types = {item["type"] for item in admin_notifications.json()["notifications"]}
+    assert "order_accepted" in admin_types
+
+    referral_code = user_referral_code("demo@kuli.local")
+    register = await client.post(
+        "/api/auth/register",
+        json={
+            "email": "referred-user@example.com",
+            "password": "ReferredUser123!",
+            "displayName": "被邀请用户",
+            "referralCode": referral_code,
+        },
+    )
+    assert register.status_code == 201
+
+    referral_notifications = await client.get("/api/notifications", headers={"Authorization": f"Bearer {demo_token}"})
+    assert referral_notifications.status_code == 200
+    referral_types = {item["type"] for item in referral_notifications.json()["notifications"]}
+    assert "referral_rewarded" in referral_types
+
+    event_types = {event["event_type"] for event in notification_events("KULI-DEMO-001")}
+    assert {"order_status_changed", "quote_created", "payment_recorded", "deliverable_uploaded", "order_accepted"}.issubset(event_types)

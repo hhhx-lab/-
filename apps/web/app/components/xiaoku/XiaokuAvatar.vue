@@ -28,7 +28,16 @@
           <button type="button" title="隐藏本页" @click="hideForPage">×</button>
         </div>
       </div>
-      <p>{{ answer }}</p>
+      <div ref="messagesRef" class="xiaoku-messages" aria-live="polite">
+        <article v-for="item in messages" :key="item.id" class="xiaoku-message" :class="item.role">
+          <span>{{ item.role === "assistant" ? "小酷" : "你" }}</span>
+          <p>{{ item.content }}</p>
+        </article>
+        <article v-if="pending" class="xiaoku-message assistant pending">
+          <span>小酷</span>
+          <p>我先帮你整理一下</p>
+        </article>
+      </div>
       <div v-if="draft" class="xiaoku-draft">
         <strong>小纸条草稿</strong>
         <span>{{ draft.summary }}</span>
@@ -41,11 +50,13 @@
       <div class="xiaoku-quick-actions">
         <NuxtLink v-for="action in quickActions" :key="action.to + action.label" :to="action.to">{{ action.label }}</NuxtLink>
       </div>
-      <div class="chat-row">
-        <input v-model="message" placeholder="问问服务、材料或订单状态" @focus="setState('calm')" @keyup.enter="send" />
-        <button type="button" @click="send">问</button>
+      <div v-if="actions.length" class="xiaoku-actions">
+        <NuxtLink v-for="action in actions" :key="action.to + action.label" :to="action.to">{{ action.label }}</NuxtLink>
       </div>
-      <NuxtLink v-for="action in actions" :key="action.to" :to="action.to">{{ action.label }}</NuxtLink>
+      <form class="chat-row" @submit.prevent="send">
+        <input v-model="message" :disabled="pending" placeholder="问问服务、材料或订单状态" @focus="setState('calm')" />
+        <button type="submit" :disabled="pending || !message.trim()">问</button>
+      </form>
     </section>
   </aside>
 </template>
@@ -54,6 +65,7 @@
 import type * as Three from "three";
 
 type XiaokuState = "idle" | "curious" | "thinking" | "happy" | "alert" | "sleep" | "hide" | "calm";
+type ChatMessage = { id: string; role: "assistant" | "user"; content: string };
 
 const api = useApi();
 const auth = useAuthStore();
@@ -66,15 +78,18 @@ const muted = ref(false);
 const followMouse = ref(true);
 const hovering = ref(false);
 const hasPointer = ref(false);
+const pending = ref(false);
 const message = ref("");
-const answer = ref("我在这儿。说不清也没关系，先给我看看。");
 const actions = ref<Array<{ label: string; to: string }>>([{ label: "写小纸条", to: "/note" }]);
 const citations = ref<Array<{ title: string; to: string; source?: string | null }>>([]);
 const draft = ref<{ serviceSlug: string; summary: string; missingFields: string[] } | null>(null);
 const sessionId = ref("");
+const visitorId = ref("");
 const motionState = ref<XiaokuState>("idle");
 const bubble = ref("");
 const canvasRef = ref<HTMLCanvasElement | null>(null);
+const messagesRef = ref<HTMLElement | null>(null);
+const messages = ref<ChatMessage[]>([]);
 const pointer = reactive({ x: 0, y: 0 });
 const offset = reactive({ x: 0, y: 0 });
 const quickActions = computed(() => pageContext(route.path).actions);
@@ -99,13 +114,13 @@ onMounted(async () => {
   reduced.value = localStorage.getItem("kuli-xiaoku-reduced") === "true";
   muted.value = localStorage.getItem("kuli-xiaoku-muted") === "true";
   followMouse.value = localStorage.getItem("kuli-xiaoku-follow") !== "false";
-  let visitorId = localStorage.getItem("kuli-visitor");
-  if (!visitorId) {
-    visitorId = crypto.randomUUID();
-    localStorage.setItem("kuli-visitor", visitorId);
+  let storedVisitorId = localStorage.getItem("kuli-visitor");
+  if (!storedVisitorId) {
+    storedVisitorId = crypto.randomUUID();
+    localStorage.setItem("kuli-visitor", storedVisitorId);
   }
-  const session = await api.createAgentSession({ pagePath: location.pathname, visitorId }, auth.token);
-  sessionId.value = session.session.id;
+  visitorId.value = storedVisitorId;
+  await createSessionForCurrentRoute();
   await initThree();
   showPageHint();
   scheduleSleep();
@@ -126,15 +141,33 @@ onBeforeUnmount(() => {
 });
 
 watch(
-  () => route.path,
+  () => route.fullPath,
   () => {
     bubble.value = "";
     offset.x = 0;
     offset.y = 0;
     hasPointer.value = false;
+    void createSessionForCurrentRoute();
     showPageHint();
   }
 );
+
+async function createSessionForCurrentRoute() {
+  if (!visitorId.value) return;
+  const session = await api.createAgentSession({ visitorId: visitorId.value, ...agentContextForRoute() }, auth.token);
+  sessionId.value = session.session.id;
+  seedGreeting();
+}
+
+function agentContextForRoute() {
+  const path = route.path || "/";
+  const serviceQuery = typeof route.query.service === "string" ? route.query.service : undefined;
+  return {
+    pagePath: path,
+    docSlug: path.startsWith("/help/") ? path.split("/").filter(Boolean).pop() : undefined,
+    serviceSlug: path.startsWith("/services/") ? path.split("/").filter(Boolean).pop() : serviceQuery
+  };
+}
 
 async function initThree() {
   if (!canvasRef.value) return;
@@ -329,6 +362,15 @@ function showPageHint() {
   }, 900);
 }
 
+function seedGreeting() {
+  const context = pageContext(route.path);
+  messages.value = [{ id: crypto.randomUUID(), role: "assistant", content: context.text }];
+  actions.value = [...context.actions];
+  citations.value = [];
+  draft.value = null;
+  void scrollMessages();
+}
+
 function isDenseRoute(path: string) {
   return path === "/services" || path.startsWith("/note") || path.startsWith("/orders") || path.startsWith("/notifications") || path.startsWith("/legal") || path.startsWith("/admin");
 }
@@ -404,14 +446,31 @@ function hideForPage() {
 }
 
 async function send() {
-  if (!message.value.trim() || !sessionId.value) return;
-  setState("thinking");
-  const response = await api.chat({ sessionId: sessionId.value, message: message.value }, auth.token);
-  answer.value = response.answer;
-  actions.value = response.actions;
-  citations.value = response.citations ?? [];
-  draft.value = response.draft ?? null;
+  const content = message.value.trim();
+  if (!content || !sessionId.value || pending.value) return;
+  messages.value.push({ id: crypto.randomUUID(), role: "user", content });
   message.value = "";
-  setState("happy", 2600);
+  pending.value = true;
+  setState("thinking");
+  await scrollMessages();
+  try {
+    const response = await api.chat({ sessionId: sessionId.value, message: content }, auth.token);
+    messages.value.push({ id: crypto.randomUUID(), role: "assistant", content: response.answer });
+    actions.value = response.actions;
+    citations.value = response.citations ?? [];
+    draft.value = response.draft ?? null;
+    setState("happy", 2600);
+  } catch {
+    messages.value.push({ id: crypto.randomUUID(), role: "assistant", content: "我这边刚才没连上，可以稍后再问一次，或者先写小纸条给管理员。" });
+    setState("alert", 2600);
+  } finally {
+    pending.value = false;
+    await scrollMessages();
+  }
+}
+
+async function scrollMessages() {
+  await nextTick();
+  if (messagesRef.value) messagesRef.value.scrollTop = messagesRef.value.scrollHeight;
 }
 </script>

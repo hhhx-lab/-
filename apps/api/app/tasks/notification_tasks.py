@@ -1,10 +1,10 @@
-from app.database import SessionLocal
+from app import database
 from app.notifications.email import send_email_event
 from app.tasks.celery_app import celery_app
 
 
 def send_notification_event_sync(event_id: str) -> str | None:
-    with SessionLocal() as db:
+    with database.SessionLocal() as db:
         event = send_email_event(db, event_id)
         return event.status if event else None
 

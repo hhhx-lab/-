@@ -29,7 +29,14 @@ from app.models.entities import (
     User,
     now_iso,
 )
-from app.notifications.events import create_email_verification_event, create_order_message_notification, create_password_reset_event
+from app.notifications.events import (
+    create_admin_notification_events,
+    create_email_verification_event,
+    create_order_customer_notification,
+    create_order_message_notification,
+    create_password_reset_event,
+    create_referral_reward_notification,
+)
 from app.notifications.in_app import list_notifications, mark_all_read, mark_read, serialize_notification, unread_count
 from app.schemas.api import (
     AdminOrderPatch,
@@ -107,6 +114,7 @@ from app.services.storage import create_presigned_download, create_presigned_upl
 from app.services.xiaoku import chat as xiaoku_chat
 from app.services.xiaoku import create_session as create_xiaoku_session
 from app.tasks.attachment_tasks import analyze_attachment, analyze_attachment_sync
+from app.tasks.notification_tasks import send_notification_event
 
 
 settings = get_settings()
@@ -126,6 +134,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def enqueue_notification_event(event_id: str) -> None:
+    if not get_settings().mail_provider:
+        return
+    try:
+        send_notification_event.delay(event_id)
+    except Exception:  # noqa: BLE001 - email queue failure must not break order/auth flows
+        pass
+
+
+def enqueue_notification_events(event_ids: list[str]) -> None:
+    for event_id in event_ids:
+        enqueue_notification_event(event_id)
 
 
 def public_user(user: User) -> dict[str, str]:
@@ -532,10 +554,14 @@ def register(input_data: RegisterIn, request: Request, db: Session = Depends(get
     )
     db.add(user)
     db.flush()
+    notification_event_ids: list[str] = []
     if referrer and referrer.id != user.id:
         referrer.points += 20
         db.add(ReferralReward(referrer_user_id=referrer.id, referred_user_id=user.id, points=20))
+        _, event = create_referral_reward_notification(db, referrer=referrer, referred_user=user, points=20)
+        notification_event_ids.append(event.id)
     db.commit()
+    enqueue_notification_events(notification_event_ids)
     db.refresh(user)
     return auth_response(user)
 
@@ -554,7 +580,7 @@ def request_email_verification(
     if not user.email_verified_at:
         ip_address = client_ip(request)
         token, _ = issue_email_verification_token(db, user=user, ip_address=ip_address)
-        create_email_verification_event(db, user=user, token=token, base_url=frontend_base_url(request))
+        event = create_email_verification_event(db, user=user, token=token, base_url=frontend_base_url(request))
         record_security_event(
             db,
             action="auth.email_verification.requested",
@@ -563,6 +589,7 @@ def request_email_verification(
             ip_address=ip_address,
         )
         db.commit()
+        enqueue_notification_event(event.id)
     return {"ok": True, "message": "如果需要验证邮件，酷里已经发出。"}
 
 
@@ -587,7 +614,7 @@ def request_password_reset(input_data: PasswordResetRequestIn, request: Request,
     user = db.query(User).filter(User.email.ilike(input_data.email)).first()
     if user:
         token, _ = issue_password_reset_token(db, user=user, ip_address=ip_address)
-        create_password_reset_event(db, user=user, token=token, base_url=frontend_base_url(request))
+        event = create_password_reset_event(db, user=user, token=token, base_url=frontend_base_url(request))
         record_security_event(
             db,
             action="auth.password_reset.requested",
@@ -596,6 +623,7 @@ def request_password_reset(input_data: PasswordResetRequestIn, request: Request,
             ip_address=ip_address,
         )
         db.commit()
+        enqueue_notification_event(event.id)
     else:
         record_security_event(
             db,
@@ -776,7 +804,17 @@ def accept_order(order_number: str, user: User = Depends(current_user), db: Sess
     order.last_customer_activity_at = now_iso()
     order.updated_at = now_iso()
     db.add(OrderEvent(order_number=order_number, status=order.status, note=note, created_by=user.id))
+    notification_events = create_admin_notification_events(
+        db,
+        event_type="order_accepted",
+        title="客户完成验收",
+        body=f"{user.display_name} 已验收订单 {order.order_number}。当前状态：{order.status}。",
+        order_number=order.order_number,
+        metadata={"status": order.status, "acceptedByUserId": user.id},
+        idempotency_key_prefix=f"order_accepted:{order.order_number}:{order.status}",
+    )
     db.commit()
+    enqueue_notification_events([event.id for event in notification_events])
     db.refresh(order)
     ensure_automation_for_order(db, order, reason="customer_acceptance")
     return {"order": order_payload(db, order)}
@@ -983,6 +1021,7 @@ def patch_admin_order(
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
     before = order.status
+    before_public_notes = order.public_notes
     for field, attr in [
         ("status", "status"),
         ("priority", "priority"),
@@ -999,9 +1038,24 @@ def patch_admin_order(
     order.last_admin_activity_at = now_iso()
     order.updated_at = now_iso()
     db.add(AdminAuditLog(order_number=order_number, actor_user_id=admin.id, action="admin.patch_order", details=input_data.model_dump_json()))
+    notification_event_ids: list[str] = []
+    customer_visible_changed = before != order.status or before_public_notes != order.public_notes
     if before != order.status:
         db.add(OrderEvent(order_number=order_number, status=order.status, note="管理员更新订单状态", created_by=admin.id))
+    if customer_visible_changed:
+        notification_result = create_order_customer_notification(
+            db,
+            order=order,
+            event_type="order_status_changed",
+            title="订单状态已更新",
+            body=f"你的订单 {order.order_number} 状态已更新为 {order.status}。{order.public_notes or order.next_action}",
+            metadata={"fromStatus": before, "toStatus": order.status, "actorUserId": admin.id},
+            idempotency_key=f"order_status_changed:{order.order_number}:{before}:{order.status}:{order.updated_at}",
+        )
+        if notification_result:
+            notification_event_ids.append(notification_result[1].id)
     db.commit()
+    enqueue_notification_events(notification_event_ids)
     db.refresh(order)
     return {"order": order_payload(db, order, admin=True)}
 
@@ -1020,12 +1074,16 @@ def create_admin_message(
     message = OrderMessage(order_number=order_number, author_user_id=admin.id, body=input_data.body, visibility=visibility)
     db.add(message)
     db.flush()
+    notification_event_id = ""
     if visibility == "public":
-        create_order_message_notification(db, order=order, message=message, actor=admin)
+        notification_result = create_order_message_notification(db, order=order, message=message, actor=admin)
+        notification_event_id = notification_result[1].id if notification_result else ""
     order.last_admin_activity_at = now_iso()
     order.updated_at = now_iso()
     db.add(AdminAuditLog(order_number=order_number, actor_user_id=admin.id, action="admin.message", details=json.dumps({"visibility": visibility})))
     db.commit()
+    if notification_event_id:
+        enqueue_notification_event(notification_event_id)
     db.refresh(order)
     ensure_automation_for_order(db, order, reason="admin_message")
     return {"order": order_payload(db, order, admin=True)}
@@ -1046,6 +1104,7 @@ def apply_automation_suggestion(
     )
     if not order or not suggestion:
         raise HTTPException(status_code=404, detail="建议不存在")
+    notification_event_ids: list[str] = []
     if suggestion.suggested_status:
         before = order.status
         order.status = suggestion.suggested_status
@@ -1053,6 +1112,17 @@ def apply_automation_suggestion(
         order.updated_at = now_iso()
         if before != order.status:
             db.add(OrderEvent(order_number=order_number, status=order.status, note=f"管理员采纳自动化建议：{suggestion.summary}", created_by=admin.id))
+            notification_result = create_order_customer_notification(
+                db,
+                order=order,
+                event_type="order_status_changed",
+                title="订单状态已更新",
+                body=f"你的订单 {order.order_number} 状态已更新为 {order.status}。{order.next_action}",
+                metadata={"fromStatus": before, "toStatus": order.status, "suggestionId": suggestion_id, "actorUserId": admin.id},
+                idempotency_key=f"order_status_changed:{order.order_number}:{before}:{order.status}:{suggestion_id}",
+            )
+            if notification_result:
+                notification_event_ids.append(notification_result[1].id)
     suggestion.status = "applied"
     suggestion.resolved_at = now_iso()
     db.add(
@@ -1064,6 +1134,7 @@ def apply_automation_suggestion(
         )
     )
     db.commit()
+    enqueue_notification_events(notification_event_ids)
     db.refresh(order)
     return {"order": order_payload(db, order, admin=True)}
 
@@ -1073,12 +1144,27 @@ def create_quote(order_number: str, input_data: QuoteInput, admin: User = Depend
     order = db.query(Order).filter(Order.order_number == order_number).first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    db.add(Quote(order_number=order_number, amount=input_data.amount, kind=input_data.kind, note=input_data.note, created_by=admin.id))
+    quote = Quote(order_number=order_number, amount=input_data.amount, kind=input_data.kind, note=input_data.note, created_by=admin.id)
+    db.add(quote)
+    db.flush()
     order.status = "quoted"
     order.quoted_price = input_data.amount
     order.public_notes = input_data.note
     db.add(OrderEvent(order_number=order_number, status="quoted", note="管理员已发送报价", created_by=admin.id))
+    notification_event_ids: list[str] = []
+    notification_result = create_order_customer_notification(
+        db,
+        order=order,
+        event_type="quote_created",
+        title="订单报价已发送",
+        body=f"你的订单 {order.order_number} 已收到报价：¥{input_data.amount:g}。{input_data.note}",
+        metadata={"quoteId": quote.id, "amount": input_data.amount, "kind": input_data.kind, "actorUserId": admin.id},
+        idempotency_key=f"quote_created:{quote.id}",
+    )
+    if notification_result:
+        notification_event_ids.append(notification_result[1].id)
     db.commit()
+    enqueue_notification_events(notification_event_ids)
     ensure_automation_for_order(db, order, reason="quote_created")
     return {"order": order_payload(db, order, admin=True)}
 
@@ -1088,20 +1174,33 @@ def create_payment(order_number: str, input_data: PaymentInput, admin: User = De
     order = db.query(Order).filter(Order.order_number == order_number).first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    db.add(
-        PaymentRecord(
-            order_number=order_number,
-            amount=input_data.amount,
-            kind=input_data.kind,
-            method=input_data.method,
-            status=input_data.status,
-            note=input_data.note,
-            created_by=admin.id,
-        )
+    payment = PaymentRecord(
+        order_number=order_number,
+        amount=input_data.amount,
+        kind=input_data.kind,
+        method=input_data.method,
+        status=input_data.status,
+        note=input_data.note,
+        created_by=admin.id,
     )
+    db.add(payment)
+    db.flush()
     order.status = "in_progress" if input_data.status == "received" else "deposit_pending"
     db.add(OrderEvent(order_number=order_number, status=order.status, note=f"管理员记录付款：{input_data.status}", created_by=admin.id))
+    notification_event_ids: list[str] = []
+    notification_result = create_order_customer_notification(
+        db,
+        order=order,
+        event_type="payment_recorded",
+        title="付款记录已更新",
+        body=f"你的订单 {order.order_number} 付款记录已更新：¥{input_data.amount:g}，状态 {input_data.status}。{input_data.note}",
+        metadata={"paymentId": payment.id, "amount": input_data.amount, "kind": input_data.kind, "status": input_data.status, "actorUserId": admin.id},
+        idempotency_key=f"payment_recorded:{payment.id}",
+    )
+    if notification_result:
+        notification_event_ids.append(notification_result[1].id)
     db.commit()
+    enqueue_notification_events(notification_event_ids)
     ensure_automation_for_order(db, order, reason="payment_recorded")
     return {"order": order_payload(db, order, admin=True)}
 
@@ -1116,19 +1215,32 @@ def create_deliverable(
     order = db.query(Order).filter(Order.order_number == order_number).first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    db.add(
-        Deliverable(
-            order_number=order_number,
-            title=input_data.title,
-            description=input_data.description,
-            storage_key=input_data.storageKey,
-            created_by=admin.id,
-        )
+    deliverable = Deliverable(
+        order_number=order_number,
+        title=input_data.title,
+        description=input_data.description,
+        storage_key=input_data.storageKey,
+        created_by=admin.id,
     )
+    db.add(deliverable)
+    db.flush()
     order.status = "review"
     order.public_notes = "交付物已上传，等待验收。"
     db.add(OrderEvent(order_number=order_number, status="review", note="管理员上传交付物", created_by=admin.id))
+    notification_event_ids: list[str] = []
+    notification_result = create_order_customer_notification(
+        db,
+        order=order,
+        event_type="deliverable_uploaded",
+        title="订单交付物已上传",
+        body=f"你的订单 {order.order_number} 已上传交付物「{input_data.title}」，请登录查看并验收。",
+        metadata={"deliverableId": deliverable.id, "storageKey": input_data.storageKey, "actorUserId": admin.id},
+        idempotency_key=f"deliverable_uploaded:{deliverable.id}",
+    )
+    if notification_result:
+        notification_event_ids.append(notification_result[1].id)
     db.commit()
+    enqueue_notification_events(notification_event_ids)
     ensure_automation_for_order(db, order, reason="deliverable_created")
     return {"order": order_payload(db, order, admin=True)}
 
@@ -1171,8 +1283,16 @@ def create_agent_session(
     user: User | None = Depends(current_user_optional),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    session = create_xiaoku_session(db, user, input_data.visitorId, input_data.pagePath)
-    return {"session": {"id": session.id, "pagePath": session.page_path, "userId": session.user_id}}
+    session = create_xiaoku_session(db, user, input_data.visitorId, input_data.pagePath, input_data.docSlug, input_data.serviceSlug)
+    return {
+        "session": {
+            "id": session.id,
+            "pagePath": session.page_path,
+            "docSlug": session.doc_slug,
+            "serviceSlug": session.service_slug,
+            "userId": session.user_id,
+        }
+    }
 
 
 @app.post("/api/agent/chat", response_model=AgentChatOut)
