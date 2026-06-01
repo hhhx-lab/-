@@ -157,6 +157,7 @@ class UserEnvelope(BaseModel):
 
 
 class UserProfileOut(UserOut):
+    otherContact: str
     points: int
     referralCode: str
     referredByUserId: str | None
@@ -170,6 +171,7 @@ class UserProfileEnvelope(BaseModel):
 
 class UserProfilePatch(BaseModel):
     displayName: str = Field(min_length=1, max_length=80)
+    otherContact: str = Field(default="", max_length=120)
 
 
 class UserOrderSummaryOut(BaseModel):
@@ -229,6 +231,10 @@ class NoteInput(BaseModel):
 class MessageInput(BaseModel):
     body: str = Field(min_length=1, max_length=2000)
     visibility: str = "public"
+
+
+class CommunicationPreferenceInput(BaseModel):
+    communicationPreference: str = Field(pattern="^(site|wecom)$")
 
 
 class AttachmentInput(BaseModel):
@@ -325,6 +331,7 @@ class OrderOut(BaseModel):
     urgency: str
     budget: str
     remoteHelp: str
+    communicationPreference: str
     intent: str
     missingFields: list[str]
     serviceConfidence: float

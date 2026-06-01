@@ -161,6 +161,7 @@ def upgrade() -> None:
         sa.Column("urgency", sa.String(length=80), nullable=False),
         sa.Column("budget", sa.String(length=80), nullable=False),
         sa.Column("remote_help", sa.String(length=80), nullable=False),
+        sa.Column("communication_preference", sa.String(length=32), nullable=False),
         sa.Column("intent", sa.String(length=60), nullable=False),
         sa.Column("missing_fields", sa.Text(), nullable=False),
         sa.Column("service_confidence", sa.Float(), nullable=False),
@@ -185,6 +186,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_orders_intent"), "orders", ["intent"], unique=False)
+    op.create_index(op.f("ix_orders_communication_preference"), "orders", ["communication_preference"], unique=False)
     op.create_index(op.f("ix_orders_order_number"), "orders", ["order_number"], unique=True)
     op.create_index(op.f("ix_orders_owner_user_id"), "orders", ["owner_user_id"], unique=False)
     op.create_index(op.f("ix_orders_priority"), "orders", ["priority"], unique=False)

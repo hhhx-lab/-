@@ -15,7 +15,11 @@ status: published
 
 ## 订单状态 {#order-status}
 
-submitted 表示已提交，clarifying 表示需要补充材料，quoted 表示已报价，deposit_pending 表示等待定金，in_progress 表示处理中，review 表示等待验收，completed 表示已完成。
+订单状态会在页面里显示成中文。已提交表示酷里正在判断，待补充表示需要你补材料，已报价表示管理员给出价格，待付定金表示复杂需求需要先确认投入，处理中表示正在执行，待验收表示交付物需要你检查，已完成表示订单结束。
+
+## 材料是否必填 {#materials-required}
+
+材料不是每次都必填。能用文字说清楚的小需求可以先提交；涉及文件处理、部署报错、账号页面、设计参考时，截图或文件会明显减少来回沟通。
 
 ## 定金与尾款 {#deposit-final-payment}
 

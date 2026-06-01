@@ -51,6 +51,7 @@ from app.schemas.api import (
     AttachmentInput,
     AuthIn,
     AuthOut,
+    CommunicationPreferenceInput,
     DeliverableInput,
     DocEnvelope,
     DocSearchOut,
@@ -183,6 +184,7 @@ def public_user(user: User) -> dict[str, str]:
 def public_profile(user: User) -> dict[str, object]:
     return {
         **public_user(user),
+        "otherContact": user.other_contact,
         "points": user.points,
         "referralCode": user.referral_code,
         "referredByUserId": user.referred_by_user_id,
@@ -400,6 +402,7 @@ def order_payload(db: Session, order: Order, admin: bool = False) -> dict[str, o
         "urgency": order.urgency,
         "budget": order.budget,
         "remoteHelp": order.remote_help,
+        "communicationPreference": order.communication_preference,
         "intent": order.intent,
         "missingFields": json.loads(order.missing_fields or "[]"),
         "serviceConfidence": order.service_confidence,
@@ -691,6 +694,7 @@ def me_profile(user: User = Depends(current_user)) -> dict[str, object]:
 @app.patch("/api/me/profile", response_model=UserProfileEnvelope)
 def patch_me_profile(input_data: UserProfilePatch, user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict[str, object]:
     user.display_name = input_data.displayName
+    user.other_contact = input_data.otherContact.strip()
     db.commit()
     db.refresh(user)
     return {"profile": public_profile(user)}
@@ -725,6 +729,10 @@ def me_summary(user: User = Depends(current_user), db: Session = Depends(get_db)
 @app.get("/api/me/referral", response_model=UserReferralEnvelope)
 def me_referral(user: User = Depends(current_user), db: Session = Depends(get_db)) -> dict[str, object]:
     rewards = db.query(ReferralReward).filter(ReferralReward.referrer_user_id == user.id).order_by(ReferralReward.created_at.desc()).all()
+    referred_users = {
+        row.id: row
+        for row in db.query(User).filter(User.id.in_([reward.referred_user_id for reward in rewards])).all()
+    } if rewards else {}
     return {
         "referral": {
             "referralCode": user.referral_code,
@@ -732,7 +740,17 @@ def me_referral(user: User = Depends(current_user), db: Session = Depends(get_db
             "points": user.points,
             "rewardedInvites": len(rewards),
             "rewards": [
-                {"id": row.id, "points": row.points, "reason": row.reason, "createdAt": row.created_at}
+                {
+                    "id": row.id,
+                    "points": row.points,
+                    "reason": row.reason,
+                    "createdAt": row.created_at,
+                    "referredUser": {
+                        "id": referred_users[row.referred_user_id].id,
+                        "displayName": referred_users[row.referred_user_id].display_name,
+                        "email": referred_users[row.referred_user_id].email,
+                    } if row.referred_user_id in referred_users else None,
+                }
                 for row in rewards[:20]
             ],
         }
@@ -805,6 +823,24 @@ def add_message(order_number: str, input_data: MessageInput, user: User = Depend
     order.updated_at = now_iso()
     db.commit()
     ensure_automation_for_order(db, order, reason="customer_message")
+    return {"order": order_payload(db, order)}
+
+
+@app.patch("/api/orders/{order_number}/communication-preference", response_model=OrderEnvelope)
+def update_communication_preference(
+    order_number: str,
+    input_data: CommunicationPreferenceInput,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    order = db.query(Order).filter(Order.order_number == order_number, Order.owner_user_id == user.id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if order.communication_preference != input_data.communicationPreference:
+        order.communication_preference = input_data.communicationPreference
+        order.last_customer_activity_at = now_iso()
+        order.updated_at = now_iso()
+        db.commit()
     return {"order": order_payload(db, order)}
 
 

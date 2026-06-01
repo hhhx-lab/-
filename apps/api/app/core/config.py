@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     app_secret_key: str = "dev-only-kuli-v2-secret-change-me"
     database_url: str = "sqlite:///./apps/api/data/kuli-v2.sqlite"
     redis_url: str = "redis://localhost:6379/0"
-    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173"
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3010,http://127.0.0.1:3010,http://localhost:5173,http://127.0.0.1:5173"
     access_token_expire_minutes: int = 60 * 24
     object_storage_provider: str = "local"
     object_storage_endpoint: str = ""

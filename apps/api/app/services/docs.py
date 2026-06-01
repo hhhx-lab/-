@@ -5,7 +5,7 @@ from pathlib import Path
 from app.core.config import get_settings
 
 
-REQUIRED_DOC_SLUGS = ["quick-start", "concepts", "faq", "guides", "contact"]
+REQUIRED_DOC_SLUGS = ["quick-start", "concepts", "guides", "faq", "privacy", "terms", "upload-policy", "contact"]
 REQUIRED_FRONTMATTER = ["slug", "title", "description", "tags", "order", "updated_at", "status"]
 VALID_DOC_STATUSES = {"published", "draft", "deprecated"}
 HEADING_RE = re.compile(r"^(#{2,4})\s+(.+?)(?:\s+\{#([a-z0-9-]+)\})?\s*$")

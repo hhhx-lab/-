@@ -105,12 +105,17 @@ def _ensure_local_schema_compat(active_engine: Engine) -> None:
             }.items():
                 if name not in columns:
                     connection.exec_driver_sql(f"ALTER TABLE order_attachments ADD COLUMN {name} {ddl}")
+        if inspector.has_table("orders"):
+            columns = {column["name"] for column in inspector.get_columns("orders")}
+            if "communication_preference" not in columns:
+                connection.exec_driver_sql("ALTER TABLE orders ADD COLUMN communication_preference VARCHAR(32) NOT NULL DEFAULT 'site'")
         if inspector.has_table("users"):
             columns = {column["name"] for column in inspector.get_columns("users")}
             for name, ddl in {
                 "points": "INTEGER NOT NULL DEFAULT 0",
                 "referral_code": "VARCHAR(40) NOT NULL DEFAULT ''",
                 "referred_by_user_id": "VARCHAR(64)",
+                "other_contact": "VARCHAR(255) NOT NULL DEFAULT ''",
                 "email_verified_at": "VARCHAR(64)",
                 "failed_login_count": "INTEGER NOT NULL DEFAULT 0",
                 "locked_until": "VARCHAR(64)",

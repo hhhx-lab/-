@@ -76,14 +76,16 @@ async def test_public_registration_profile_summary_referral_and_order_gate(clien
     assert referral.json()["referral"]["referralCode"] == referral_code
     assert referral.json()["referral"]["rewardedInvites"] == 1
     assert referral.json()["referral"]["points"] == 20
+    assert referral.json()["referral"]["rewards"][0]["referredUser"]["email"] == "invited@example.com"
 
     updated_profile = await client.patch(
         "/api/me/profile",
         headers={"Authorization": f"Bearer {inviter_token}"},
-        json={"displayName": "酷里邀请人"},
+        json={"displayName": "酷里邀请人", "otherContact": "微信 kuly-helper"},
     )
     assert updated_profile.status_code == 200
     assert updated_profile.json()["profile"]["displayName"] == "酷里邀请人"
+    assert updated_profile.json()["profile"]["otherContact"] == "微信 kuly-helper"
 
     create_order = await client.post(
         "/api/orders",
@@ -142,7 +144,7 @@ async def test_docs_center_reads_required_markdown_documents(client: httpx.Async
     docs = await client.get("/api/docs")
     assert docs.status_code == 200
     items = docs.json()["docs"]
-    assert [item["slug"] for item in items] == ["quick-start", "concepts", "faq", "guides", "contact"]
+    assert [item["slug"] for item in items] == ["quick-start", "concepts", "faq", "guides", "privacy", "contact", "terms", "upload-policy"]
     assert all(item["title"] and item["description"] and item["updatedAt"] for item in items)
     assert {item["status"] for item in items} == {"published"}
 
@@ -170,9 +172,37 @@ async def test_auth_and_user_order_isolation(client: httpx.AsyncClient) -> None:
     demo_orders = await client.get("/api/orders", headers={"Authorization": f"Bearer {demo_token}"})
     assert demo_orders.status_code == 200
     assert [order["orderNumber"] for order in demo_orders.json()["orders"]] == ["KULI-DEMO-001"]
+    assert demo_orders.json()["orders"][0]["communicationPreference"] == "site"
 
     forbidden = await client.get("/api/orders/KULI-DEMO-001", headers={"Authorization": f"Bearer {other_token}"})
     assert forbidden.status_code == 404
+
+    preference = await client.patch(
+        "/api/orders/KULI-DEMO-001/communication-preference",
+        headers={"Authorization": f"Bearer {demo_token}"},
+        json={"communicationPreference": "wecom"},
+    )
+    assert preference.status_code == 200
+    assert preference.json()["order"]["communicationPreference"] == "wecom"
+
+    forbidden_preference = await client.patch(
+        "/api/orders/KULI-DEMO-001/communication-preference",
+        headers={"Authorization": f"Bearer {other_token}"},
+        json={"communicationPreference": "site"},
+    )
+    assert forbidden_preference.status_code == 404
+
+    invalid_preference = await client.patch(
+        "/api/orders/KULI-DEMO-001/communication-preference",
+        headers={"Authorization": f"Bearer {demo_token}"},
+        json={"communicationPreference": "sms"},
+    )
+    assert invalid_preference.status_code == 422
+
+    admin_token = await login(client, "admin@kuli.local", "KuliAdmin123!")
+    admin_detail = await client.get("/api/admin/orders/KULI-DEMO-001", headers={"Authorization": f"Bearer {admin_token}"})
+    assert admin_detail.status_code == 200
+    assert admin_detail.json()["order"]["communicationPreference"] == "wecom"
 
     presign = await client.post(
         "/api/uploads/presign",
@@ -224,7 +254,6 @@ async def test_auth_and_user_order_isolation(client: httpx.AsyncClient) -> None:
     )
     assert forbidden_download.status_code == 404
 
-    admin_token = await login(client, "admin@kuli.local", "KuliAdmin123!")
     admin_download = await client.get(
         f"/api/orders/KULI-DEMO-001/attachments/{attachment_id}/download",
         headers={"Authorization": f"Bearer {admin_token}"},
