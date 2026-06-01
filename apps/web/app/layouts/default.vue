@@ -3,15 +3,15 @@
     <header class="topbar">
       <div class="shell nav">
         <NuxtLink class="brand" to="/" aria-label="酷里小窗口首页">
-          <span class="mark" aria-hidden="true">K</span>
-          <span class="brand-name"><strong>酷里 Kuli</strong><span>酷里小窗口</span></span>
+          <span class="mark logo-mark" aria-hidden="true"><img src="/kuly-logo.png" alt=""></span>
+          <span class="brand-name"><strong>酷里 Kuly</strong><span>酷里小窗口</span></span>
         </NuxtLink>
         <nav class="navlinks" aria-label="主导航">
           <NuxtLink to="/services">能做什么</NuxtLink>
-          <NuxtLink to="/help">知识库</NuxtLink>
-          <NuxtLink to="/products">产品</NuxtLink>
           <NuxtLink to="/note">写小纸条</NuxtLink>
           <NuxtLink to="/orders">我的订单</NuxtLink>
+          <NuxtLink to="/products">产品</NuxtLink>
+          <NuxtLink to="/help">文档说明</NuxtLink>
           <NuxtLink v-if="auth.user?.role === 'admin'" to="/admin">管理后台</NuxtLink>
         </nav>
         <div class="nav-actions">
@@ -23,7 +23,7 @@
               <i v-if="unreadCount" class="notification-badge" aria-label="未读通知">{{ unreadCount }}</i>
             </summary>
             <div class="account-popover">
-              <NuxtLink to="/me">个人主页</NuxtLink>
+              <NuxtLink to="/me">我的酷里</NuxtLink>
               <NuxtLink to="/orders">我的订单</NuxtLink>
               <NuxtLink to="/notifications">通知中心<span v-if="unreadCount">{{ unreadCount }}</span></NuxtLink>
               <NuxtLink to="/settings">设置</NuxtLink>
@@ -41,12 +41,12 @@
     </main>
     <footer class="site-footer">
       <div class="shell">
-        <span>酷里 Kuli</span>
+        <span>酷里 Kuly</span>
         <nav aria-label="法律与服务说明">
-          <NuxtLink to="/legal/privacy">隐私政策</NuxtLink>
-          <NuxtLink to="/legal/terms">服务条款</NuxtLink>
-          <NuxtLink to="/legal/upload-policy">上传说明</NuxtLink>
-          <NuxtLink to="/help/contact">联系我们</NuxtLink>
+          <NuxtLink to="/help?doc=privacy">隐私政策</NuxtLink>
+          <NuxtLink to="/help?doc=terms">服务条款</NuxtLink>
+          <NuxtLink to="/help?doc=upload-policy">上传说明</NuxtLink>
+          <NuxtLink to="/help?doc=contact">联系我们</NuxtLink>
         </nav>
       </div>
     </footer>

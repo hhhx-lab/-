@@ -1,8 +1,14 @@
 <template>
-  <section class="shell page-hero">
-    <p class="eyebrow">能做什么 / 怎么帮我</p>
-    <h1 class="mega">不是万能客服，是一支会先帮你<em>拆问题</em>的小队。</h1>
-    <p class="lead">遇到临时卡住的小事，可以先丢给酷里看看。能说明白最好；说不清也没关系，我们会帮你把关键点一点点问出来。</p>
+  <section class="shell page-hero services-hero">
+    <h1 class="mega">先拆问题，再决定怎么做</h1>
+    <p class="lead">
+      <span>遇到临时卡住的小事，可以先丢给酷里看看。</span>
+      <span>说不清也没关系，我们会把关键点一点点问出来</span>
+    </p>
+    <div class="hero-actions">
+      <NuxtLink class="button" to="/note">直接丢一张小纸条</NuxtLink>
+      <a class="button secondary" href="#services">看看服务范围</a>
+    </div>
   </section>
 
   <section class="shell section" id="services">
@@ -18,7 +24,7 @@
           <p>{{ service.summary }}</p>
         </div>
         <ul class="inline-list">
-          <li v-for="need in service.commonNeeds.slice(0, 3)" :key="need" class="chip">{{ need }}</li>
+          <li v-for="need in service.commonNeeds.slice(0, 3)" :key="need" class="need-tag">{{ need }}</li>
         </ul>
       </NuxtLink>
     </div>
@@ -26,14 +32,12 @@
 
   <section class="shell section" id="cases">
     <div class="section-head">
-      <h2>几个常见小活样子</h2>
+      <h2>几个常见小活</h2>
       <p>这些是判断参考，不是固定商品。酷里会先看你的具体情况。</p>
     </div>
     <div class="grid">
       <article v-for="item in caseCards" :key="item.title" class="card case-card" :class="{ featured: item.featured }">
-        <div class="tag-row">
-          <span v-for="tag in item.tags" :key="tag" class="chip">{{ tag }}</span>
-        </div>
+        <p class="plain-label">{{ item.tags.join(" / ") }}</p>
         <div>
           <h3>{{ item.title }}</h3>
           <p>{{ item.description }}</p>
@@ -52,15 +56,18 @@
 
   <section class="shell section split-band" id="rules">
     <article class="panel window quote-panel">
-      <div class="window-bar"><span class="dot red" /><span class="dot yellow" /><span class="dot green" /><span>rule.note</span></div>
-      <blockquote>小需求可以验收后付款；复杂需求先收定金。</blockquote>
+      <p class="plain-label">交易规则</p>
+      <blockquote>
+        <span>小需求可以验收后付款；</span>
+        <span>复杂需求先收定金</span>
+      </blockquote>
       <cite>默认不包长期售后，后续维护、部署、修改另算。</cite>
     </article>
     <div class="timeline">
-      <div class="timeline-item"><span class="step-num">1</span><div><strong>先判断</strong><p>你把材料发来，酷里先看能不能做、风险在哪里。</p></div></div>
-      <div class="timeline-item"><span class="step-num">2</span><div><strong>再报价</strong><p>范围清楚后给大致价格；说不清的会继续追问。</p></div></div>
-      <div class="timeline-item"><span class="step-num">3</span><div><strong>确认验收方式</strong><p>交付什么、怎么判断完成、是否需要部署，先讲明白。</p></div></div>
-      <div class="timeline-item"><span class="step-num">4</span><div><strong>交付后结清</strong><p>小活可验收后付款；定金项目按约定节点结算。</p></div></div>
+      <div class="timeline-item"><span class="step-num">1</span><div><strong>先判断</strong><p>你把材料发来，酷里先看能不能做、风险在哪里</p></div></div>
+      <div class="timeline-item"><span class="step-num">2</span><div><strong>再报价</strong><p>范围清楚后给大致价格；说不清的会继续追问</p></div></div>
+      <div class="timeline-item"><span class="step-num">3</span><div><strong>确认验收方式</strong><p>交付什么、怎么判断完成、是否需要部署，先讲明白</p></div></div>
+      <div class="timeline-item"><span class="step-num">4</span><div><strong>交付后结清</strong><p>小活可验收后付款；定金项目按约定节点结算</p></div></div>
     </div>
   </section>
 

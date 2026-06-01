@@ -3,7 +3,7 @@
 
 export type AdminOrderEnvelope = { order: AdminOrderOut };
 
-export type AdminOrderOut = { id: string; orderNumber: string; customerName: string; contact: string; serviceSlug: string; category: string; title: string; demand: string; originalDemand: string; polishedDemand: string; urgency: string; budget: string; remoteHelp: string; intent: string; missingFields: string[]; serviceConfidence: number; quotedPrice: number | null; status: string; aiStatus: string; nextAction: string; publicNotes: string; createdAt: string; updatedAt: string; events: OrderEventOut[]; messages: OrderMessageOut[]; attachments: OrderAttachmentOut[]; quotes: QuoteOut[]; payments: PaymentRecordOut[]; deliverables: DeliverableOut[]; ownerUserId: string | null; cost: number | null; profit: number | null; priority: string; internalNotes: string; assignedAdminId: string | null; automationAuditCount: number; automationSuggestions: AutomationSuggestionOut[]; todos: OrderTodoOut[]; aiSummaries: OrderAiSummaryOut[] };
+export type AdminOrderOut = { id: string; orderNumber: string; customerName: string; contact: string; serviceSlug: string; category: string; title: string; demand: string; originalDemand: string; polishedDemand: string; urgency: string; budget: string; remoteHelp: string; communicationPreference: string; intent: string; missingFields: string[]; serviceConfidence: number; quotedPrice: number | null; status: string; aiStatus: string; nextAction: string; publicNotes: string; createdAt: string; updatedAt: string; events: OrderEventOut[]; messages: OrderMessageOut[]; attachments: OrderAttachmentOut[]; quotes: QuoteOut[]; payments: PaymentRecordOut[]; deliverables: DeliverableOut[]; ownerUserId: string | null; cost: number | null; profit: number | null; priority: string; internalNotes: string; assignedAdminId: string | null; automationAuditCount: number; automationSuggestions: AutomationSuggestionOut[]; todos: OrderTodoOut[]; aiSummaries: OrderAiSummaryOut[] };
 
 export type AdminOrderPatch = { status?: string | null; priority?: string | null; quotedPrice?: number | null; cost?: number | null; profit?: number | null; publicNotes?: string | null; internalNotes?: string | null; nextAction?: string | null };
 
@@ -40,6 +40,8 @@ export type AuthIn = { email: string; password: string };
 export type AuthOut = { token: string; user: UserOut };
 
 export type AutomationSuggestionOut = { id: string; kind: string; severity: string; summary: string; suggestedStatus: string | null; suggestedMessage: string; confidence: number; status: string; reason: string; createdAt: string };
+
+export type CommunicationPreferenceInput = { communicationPreference: string };
 
 export type DeliverableInput = { title: string; description?: string; storageKey: string };
 
@@ -95,7 +97,7 @@ export type OrderEventOut = { id: string; status: string; note: string; createdB
 
 export type OrderMessageOut = { id: string; authorUserId: string; body: string; visibility: string; createdAt: string };
 
-export type OrderOut = { id: string; orderNumber: string; customerName: string; contact: string; serviceSlug: string; category: string; title: string; demand: string; originalDemand: string; polishedDemand: string; urgency: string; budget: string; remoteHelp: string; intent: string; missingFields: string[]; serviceConfidence: number; quotedPrice: number | null; status: string; aiStatus: string; nextAction: string; publicNotes: string; createdAt: string; updatedAt: string; events: OrderEventOut[]; messages: OrderMessageOut[]; attachments: OrderAttachmentOut[]; quotes: QuoteOut[]; payments: PaymentRecordOut[]; deliverables: DeliverableOut[] };
+export type OrderOut = { id: string; orderNumber: string; customerName: string; contact: string; serviceSlug: string; category: string; title: string; demand: string; originalDemand: string; polishedDemand: string; urgency: string; budget: string; remoteHelp: string; communicationPreference: string; intent: string; missingFields: string[]; serviceConfidence: number; quotedPrice: number | null; status: string; aiStatus: string; nextAction: string; publicNotes: string; createdAt: string; updatedAt: string; events: OrderEventOut[]; messages: OrderMessageOut[]; attachments: OrderAttachmentOut[]; quotes: QuoteOut[]; payments: PaymentRecordOut[]; deliverables: DeliverableOut[] };
 
 export type OrderTodoOut = { id: string; title: string; source: string; status: string; dueAt: string | null; createdAt: string };
 
@@ -276,6 +278,9 @@ export type ApiPaths = {
   };
   "/api/orders/{order_number}/attachments/{attachment_id}/download": {
     get: { response: AttachmentDownloadEnvelope };
+  };
+  "/api/orders/{order_number}/communication-preference": {
+    patch: { request: CommunicationPreferenceInput; response: OrderEnvelope };
   };
   "/api/orders/{order_number}/messages": {
     post: { request: MessageInput; response: OrderEnvelope };

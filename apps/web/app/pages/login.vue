@@ -1,17 +1,5 @@
 <template>
-  <section class="section form-shell auth-page">
-    <div class="auth-copy">
-      <div class="eyebrow">Account</div>
-      <h1>{{ mode === "login" ? "回到你的酷里窗口。" : "先开一个酷里账号。" }}</h1>
-      <p>
-        {{ mode === "login" ? "登录后可以写小纸条、查看订单进度、继续和小酷沟通。" : "注册后会自动登录，并回到你刚才想去的页面。" }}
-      </p>
-      <div class="notice">
-        <strong>公开注册</strong>
-        <span>注册只会创建普通账号；管理员账号不从这里创建。</span>
-      </div>
-    </div>
-
+  <section class="section form-shell auth-page auth-page-centered">
     <form class="form auth-form" @submit.prevent="submit">
       <div class="segmented">
         <button class="button secondary" :class="{ active: mode === 'login' }" type="button" @click="mode = 'login'">登录</button>
@@ -112,11 +100,11 @@ onMounted(async () => {
   await auth.restore();
   if (route.query.verifyToken) await confirmVerification(String(route.query.verifyToken));
   if (resetToken.value) showResetRequest.value = false;
-  if (auth.user && route.query.redirect) await router.replace(String(route.query.redirect));
+  if (auth.user) await router.replace("/");
 });
 
 useKuliSeo({
-  title: "登录或注册 | 酷里 Kuli",
+  title: "登录或注册 | 酷里 Kuly",
   description: "使用邮箱和密码登录酷里，登录后可以写小纸条、查看自己的订单进度、接收通知并继续和小酷沟通。",
   path: "/login"
 });
@@ -134,8 +122,7 @@ async function submit() {
         referralCode: referralCode.value || undefined
       });
     }
-    const fallback = auth.user?.role === "admin" ? "/admin" : "/orders";
-    await router.push(String(route.query.redirect ?? fallback));
+    await router.push("/");
   } catch (caught) {
     error.value = caught instanceof ApiError ? caught.message : "提交失败，请稍后再试";
   }

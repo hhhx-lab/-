@@ -1,16 +1,15 @@
 <template>
   <section class="shell hero">
     <div>
-      <p class="eyebrow">AI 创客小队 · 小需求急救</p>
-      <h1>搞不动？先丢给<em>酷里</em>看看。</h1>
-      <p class="lead">文件处理不了、AI 工具不会配置、GPT / Google / Claude 服务不会开通、小程序网页想做 demo、服务器部署卡住，都可以先从一张小纸条开始。</p>
+      <h1>有什么搞不定，先丢给<em>酷里</em>看看</h1>
+      <p class="lead">文件处理、AI 工具配置、小程序网页 demo、服务器部署卡住，都可以先从一张小纸条开始</p>
       <div class="hero-actions">
         <NuxtLink class="button" to="/note">丢张小纸条给酷里看看</NuxtLink>
         <NuxtLink class="button secondary" to="/services">看看能帮什么</NuxtLink>
       </div>
     </div>
-    <div class="panel window">
-      <div class="window-bar"><span class="dot red" /><span class="dot yellow" /><span class="dot green" /><span>$ kuli ask</span></div>
+    <div class="panel window hero-contact-window">
+      <div class="window-label hero-window-label"><span>需求沟通台</span></div>
       <div class="chat-line me"><div class="bubble">我想开 GPT Pro，但不知道怎么弄。</div></div>
       <div class="chat-line"><span class="avatar">K</span><div class="bubble">先把你在哪、用什么账号、方便怎么付说一下就好；小活确认能做，做好你看过再结。</div></div>
       <div class="chat-line me"><div class="bubble">还有一个 PDF 想翻译，格式不要乱。</div></div>
@@ -21,8 +20,8 @@
 
   <section class="shell section">
     <div class="section-head">
-      <h2>最近大家问得最多的，都在这了。</h2>
-      <p>不是标准商品列表，更像一扇小窗口：先说问题，酷里判断能不能做、怎么做、多少钱。</p>
+      <h2>最近大家都在问</h2>
+      <p>不是标准商品列表，更像一扇小窗口：先说问题，酷里判断能不能做、怎么做。</p>
     </div>
     <div class="grid">
       <article class="card service-card featured">
@@ -66,12 +65,49 @@
       <strong>提醒</strong>
       <span>默认不包长期售后。后续部署、维护、修改、二次开发会另算。</span>
     </article>
-</section>
+  </section>
+
+  <section class="shell section home-contact-section">
+    <div class="section-head">
+      <h2>联系我们</h2>
+      <p>订单沟通默认在站内完成；也可以通过这些渠道找到酷里。</p>
+    </div>
+    <div class="home-contact-grid">
+      <article class="contact-channel-card">
+        <div>
+          <span>QQ 群</span>
+          <strong>加入群聊</strong>
+        </div>
+        <img src="/contact/qq-group.png" alt="酷里 QQ 群二维码" />
+      </article>
+      <article class="contact-channel-card">
+        <div>
+          <span>企业微信</span>
+          <strong>联系小助手</strong>
+        </div>
+        <img src="/contact/wecom-contact.png" alt="酷里企业微信二维码" />
+      </article>
+      <article class="contact-channel-card">
+        <div>
+          <span>微信公众号</span>
+          <strong>关注酷里</strong>
+        </div>
+        <img src="/contact/wechat-official.jpg" alt="酷里微信公众号二维码" />
+      </article>
+      <article class="contact-channel-card">
+        <div>
+          <span>小红书</span>
+          <strong>看看动态</strong>
+        </div>
+        <img src="/contact/xiaohongshu.png" alt="酷里小红书二维码" />
+      </article>
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">
 useKuliSeo({
-  title: "酷里 Kuli | AI 工具、文档处理和小工具开发服务",
+  title: "酷里 Kuly | AI 工具、文档处理和小工具开发服务",
   description: "酷里帮助用户从一张小纸条开始咨询 AI 工具、文档处理、小工具开发、部署配置和 API/token 相关需求，先判断边界，再推进订单交付。",
   path: "/"
 });

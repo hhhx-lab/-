@@ -2,7 +2,7 @@
   <section class="section notifications-page">
     <div class="notifications-hero">
       <div>
-        <p class="eyebrow">Notifications</p>
+        <p class="plain-label">通知中心</p>
         <h1>通知中心</h1>
         <p>订单回复、报价、交付和系统消息都会集中在这里，邮件失败也不影响站内提醒。</p>
       </div>

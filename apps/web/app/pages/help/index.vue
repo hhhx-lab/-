@@ -1,93 +1,182 @@
 <template>
-  <section class="shell page-hero">
-    <p class="eyebrow">酷里知识库</p>
-    <h1 class="mega">不知道怎么问，就先从这里<em>翻一翻</em>。</h1>
-    <p class="lead">这里和小酷使用同一套公开业务知识：服务说明、材料要求、收费边界、订单状态和安全规则。</p>
-    <div class="hero-actions">
-      <NuxtLink class="button" to="/note">直接写小纸条</NuxtLink>
-      <NuxtLink class="button secondary" to="/services">看服务详情</NuxtLink>
+  <section class="shell docs-home docs-search-band">
+    <div class="docs-command">
+      <div class="field">
+        <label for="doc-search">搜索文档说明</label>
+        <input
+          id="doc-search"
+          v-model="searchQuery"
+          type="search"
+          placeholder="搜索服务范围、付款、上传、隐私、联系我们"
+          @keyup.enter="runSearch"
+        >
+      </div>
+      <button class="button" type="button" :disabled="searchBusy || !searchQuery.trim()" @click="runSearch">
+        {{ searchBusy ? "搜索中" : "搜索" }}
+      </button>
+    </div>
+
+    <div class="docs-search-shortcuts" aria-label="常用文档">
+      <button v-for="item in hotDocs" :key="item.slug" type="button" @click="selectDoc(item.slug)">
+        {{ item.title }}
+      </button>
+    </div>
+
+    <div v-if="searched" class="knowledge-results docs-search-results">
+      <article v-for="item in searchResults" :key="`${item.slug}-${item.anchor ?? 'top'}`" class="knowledge-card card dense">
+        <div>
+          <h2>{{ item.title }}</h2>
+          <p>{{ item.excerpt }}</p>
+        </div>
+        <button class="button secondary" type="button" @click="openSearchResult(item)">打开</button>
+      </article>
+      <div v-if="!searchResults.length" class="empty-state">
+        <strong>没有找到匹配文档</strong>
+        <p>换一个关键词试试，例如“上传”“定金”“隐私”“联系”</p>
+      </div>
     </div>
   </section>
 
-  <section class="shell section two-col">
-    <aside class="panel window knowledge-search">
-      <div class="window-bar"><span class="dot red" /><span class="dot yellow" /><span class="dot green" /><span>knowledge.find</span></div>
-      <div class="field">
-        <label for="knowledge-search">搜一个卡住的点</label>
-        <input id="knowledge-search" v-model="searchText" type="search" placeholder="例如：PDF、定金、订单状态、材料">
-      </div>
-      <div class="choice-row">
-        <label v-for="item in scopeFilters" :key="item.value">
-          <input v-model="scope" type="radio" name="scope" :value="item.value">
-          <span>{{ item.label }}</span>
-        </label>
-      </div>
-      <div class="sticky-note">
-        <strong>小酷也看这里</strong>页面、FAQ 和小酷回答都从这份知识源延伸，避免一个地方一个说法。
-      </div>
+  <section class="shell docs-layout docs-home-reader">
+    <aside class="docs-sidebar">
+      <strong>文档目录</strong>
+      <button
+        v-for="item in docs"
+        :key="item.slug"
+        class="doc-nav-button"
+        :class="{ active: item.slug === activeSlug }"
+        type="button"
+        @click="selectDoc(item.slug)"
+      >
+        <span>{{ item.title }}</span>
+        <small>{{ item.description }}</small>
+      </button>
     </aside>
 
-    <div class="knowledge-results">
-      <article v-for="item in filteredArticles" :key="item.id" class="card knowledge-card">
-        <div class="tag-row">
-          <span class="chip">{{ scopeLabel(item.scope) }}</span>
-          <span v-for="tag in item.tags.slice(0, 3)" :key="tag" class="chip">{{ tag }}</span>
-        </div>
-        <h2>{{ item.title }}</h2>
-        <p>{{ item.body }}</p>
-        <footer>
-          <span>{{ item.source }}</span>
-          <NuxtLink v-if="serviceSlug(item.source)" class="chip" :to="`/services/${serviceSlug(item.source)}`">看详情 →</NuxtLink>
-        </footer>
-      </article>
-      <article v-if="!filteredArticles.length" class="notice">
-        <strong>没有匹配</strong>
-        <span>换个说法试试，或者直接写小纸条让酷里继续追问。</span>
-      </article>
-    </div>
+    <article v-if="activeDoc" class="doc-reader">
+      <p class="plain-label">{{ categoryLabel(activeDoc.category) }}</p>
+      <h1>{{ activeDoc.title }}</h1>
+      <p class="lead">{{ activeDoc.description }}</p>
+      <p class="doc-meta-line">{{ [...activeDoc.tags, `更新 ${display.date(activeDoc.updatedAt)}`].join(" / ") }}</p>
+
+      <div id="doc-content" class="doc-body" v-html="htmlContent" />
+    </article>
+
+    <aside v-if="activeDoc" class="doc-toc doc-home-aside">
+      <section>
+        <strong>本页目录</strong>
+        <button
+          v-for="anchor in activeDoc.anchors"
+          :key="anchor.id"
+          type="button"
+          @click="scrollToAnchor(anchor.id)"
+        >
+          {{ anchor.title }}
+        </button>
+      </section>
+      <section class="doc-hot-list">
+        <strong>高频文档</strong>
+        <button v-for="item in hotDocs" :key="item.slug" type="button" @click="selectDoc(item.slug)">
+          {{ item.title }}
+        </button>
+      </section>
+    </aside>
   </section>
 </template>
 
 <script setup lang="ts">
-import type { KnowledgeArticle } from "~/composables/useApi";
+import type { DocDetail, DocSummary } from "~/composables/useApi";
+import type { DocSearchResult } from "~/composables/useApi";
 
 const api = useApi();
-const { data } = await useAsyncData("knowledge", () => api.listKnowledge());
-const articles = computed(() => data.value?.articles ?? []);
-const searchText = ref("");
-const scope = ref("all");
+const route = useRoute();
+const router = useRouter();
+const markdown = useMarkdown();
+const display = useDisplayText();
+const searchQuery = ref("");
+const searchResults = ref<DocSearchResult[]>([]);
+const searchBusy = ref(false);
+const searched = ref(false);
+const { data: docsData } = await useAsyncData("docs-home", () => api.listDocs());
+const docs = computed(() => docsData.value?.docs ?? []);
+const activeSlug = ref(String(route.query.doc ?? "quick-start"));
+const docCache = reactive<Record<string, DocDetail>>({});
+const { data: initialDocData } = await useAsyncData(
+  () => `docs-home-active-${activeSlug.value}`,
+  () => api.getDoc(activeSlug.value),
+  { watch: [activeSlug] }
+);
 
-const scopeFilters = [
-  { label: "全部", value: "all" },
-  { label: "服务", value: "service" },
-  { label: "规则", value: "rule" },
-  { label: "FAQ", value: "faq" },
-  { label: "安全", value: "safety" }
-];
+const activeDoc = computed(() => docCache[activeSlug.value] ?? initialDocData.value?.doc ?? null);
+const htmlContent = computed(() => markdown.render(activeDoc.value?.content ?? ""));
 
-const filteredArticles = computed(() => {
-  const query = searchText.value.trim().toLowerCase();
-  return articles.value.filter((item) => {
-    const inScope = scope.value === "all" || item.scope === scope.value;
-    if (!inScope) return false;
-    if (!query) return true;
-    const haystack = `${item.title}\n${item.body}\n${item.tags.join(" ")}`.toLowerCase();
-    return haystack.includes(query);
-  });
+const hotDocs = computed<DocSummary[]>(() => {
+  const wanted = ["quick-start", "concepts", "faq", "upload-policy", "contact"];
+  return wanted.map((slug) => docs.value.find((item) => item.slug === slug)).filter(Boolean) as DocSummary[];
 });
 
-function scopeLabel(value: KnowledgeArticle["scope"]) {
-  const match = scopeFilters.find((item) => item.value === value);
-  return match?.label ?? value;
+watch(
+  initialDocData,
+  (payload) => {
+    if (payload?.doc) docCache[payload.doc.slug] = payload.doc;
+  },
+  { immediate: true }
+);
+
+watch(
+  () => route.query.doc,
+  (slug) => {
+    if (slug && String(slug) !== activeSlug.value) activeSlug.value = String(slug);
+  }
+);
+
+watch(
+  docs,
+  (items) => {
+    if (items.length && !items.some((item) => item.slug === activeSlug.value)) activeSlug.value = "quick-start";
+  },
+  { immediate: true }
+);
+
+function categoryLabel(category: string) {
+  const labels: Record<string, string> = {
+    docs: "文档说明",
+    rules: "规则与条款"
+  };
+  return labels[category] ?? category;
 }
 
-function serviceSlug(source: string) {
-  return source.startsWith("service:") ? source.replace("service:", "") : "";
+function scrollToAnchor(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function selectDoc(slug: string) {
+  activeSlug.value = slug;
+  await router.replace({ path: "/help", query: { doc: slug } });
+}
+
+async function runSearch() {
+  const query = searchQuery.value.trim();
+  if (!query) return;
+  searchBusy.value = true;
+  searched.value = true;
+  try {
+    searchResults.value = (await api.searchDocs(query)).results;
+  } finally {
+    searchBusy.value = false;
+  }
+}
+
+async function openSearchResult(item: DocSearchResult) {
+  await selectDoc(item.slug);
+  if (!item.anchor) return;
+  await nextTick();
+  scrollToAnchor(item.anchor);
 }
 
 useKuliSeo({
-  title: "酷里文档中心 | 快速开始、核心概念、FAQ 和指南",
-  description: "酷里文档中心收录快速开始、核心概念、常见问题、指南和联系我们说明，并作为小酷 Agent 的公开业务知识来源。",
+  title: "酷里文档说明 | 快速开始、核心概念、FAQ 和规则",
+  description: "酷里文档说明收录快速开始、核心概念、常见问题、指南、隐私政策、服务条款、上传说明和联系我们，并作为小酷 Agent 的公开业务知识来源。",
   path: "/help"
 });
 </script>

@@ -1,7 +1,7 @@
 <template>
   <section v-if="service" class="shell page-hero service-detail-hero">
     <NuxtLink class="back-link" to="/services">返回服务列表</NuxtLink>
-    <p class="eyebrow">{{ service.tag }}</p>
+    <p class="plain-label">{{ service.tag }}</p>
     <h1 class="mega">{{ service.title }}</h1>
     <p class="lead">{{ service.summary }}</p>
     <div class="hero-actions">
@@ -12,8 +12,8 @@
 
   <section v-if="service" class="shell section detail-intro">
     <article class="panel window quote-panel">
-      <div class="window-bar"><span class="dot red" /><span class="dot yellow" /><span class="dot green" /><span>{{ service.slug }}.note</span></div>
-      <blockquote>先判断能不能做，再讲清楚怎么交付。</blockquote>
+      <p class="plain-label">服务判断</p>
+      <blockquote>先判断能不能做，再讲清楚怎么交付</blockquote>
       <cite>{{ service.priceRange }} · {{ service.timeline }}</cite>
     </article>
     <div class="timeline">
@@ -25,27 +25,27 @@
 
   <section v-if="service" class="shell section">
     <div class="section-head">
-      <h2>点进来以后，先看这几件事。</h2>
+      <h2>点进来以后，先看这几件事</h2>
       <p>每个服务详情都按同一套结构展示，避免用户只看到一个空泛服务名。</p>
     </div>
     <div class="detail-grid">
       <section>
-        <span class="chip">常见需求</span>
+        <span class="plain-label">常见需求</span>
         <h2>你可能想解决</h2>
         <ul><li v-for="item in service.commonNeeds" :key="item">{{ item }}</li></ul>
       </section>
       <section>
-        <span class="chip">交付物</span>
+        <span class="plain-label">交付物</span>
         <h2>最后能拿到</h2>
         <ul><li v-for="item in service.deliverables" :key="item">{{ item }}</li></ul>
       </section>
       <section>
-        <span class="chip">材料清单</span>
+        <span class="plain-label">材料清单</span>
         <h2>你需要准备</h2>
         <ul><li v-for="item in service.requiredMaterials" :key="item">{{ item }}</li></ul>
       </section>
       <section>
-        <span class="chip">风险边界</span>
+        <span class="plain-label">风险边界</span>
         <h2>先说清楚</h2>
         <ul><li v-for="item in service.risks" :key="item">{{ item }}</li></ul>
       </section>
@@ -55,11 +55,11 @@
   <section v-if="service" class="shell section">
     <div class="section-head">
       <h2>参考案例</h2>
-      <p>不是固定套餐，是酷里判断范围和风险时的参考样子。</p>
+      <p>不是固定套餐，是酷里判断范围和风险时的参考案例。</p>
     </div>
     <div class="grid">
       <article v-for="item in service.cases" :key="item.title" class="card case-card featured">
-        <div class="tag-row"><span class="chip">{{ service.tag }}</span><span class="chip">{{ service.timeline }}</span></div>
+        <p class="plain-label">{{ service.tag }} / {{ service.timeline }}</p>
         <div><h3>{{ item.title }}</h3><p>{{ item.description }}</p></div>
         <footer><span>适合：{{ service.audience[0] }}</span><strong>先拆范围</strong></footer>
       </article>
@@ -93,9 +93,9 @@
 
   <section v-if="service" class="shell section detail-cta">
     <div>
-      <p class="eyebrow">Ready?</p>
-      <h2>把这个问题先丢给酷里看看。</h2>
-      <p class="lead">你不用写方案，只要告诉我们现在卡在哪里、想达到什么效果、能提供哪些材料。</p>
+      <p class="plain-label">准备好了</p>
+      <h2>把这个问题先丢给酷里看看</h2>
+      <p class="lead">你不用写方案，只要告诉我们现在卡在哪里、想达到什么效果、能提供哪些材料</p>
     </div>
     <NuxtLink class="button" :to="`/note?service=${service.slug}`">带入“{{ service.tag }}”写小纸条</NuxtLink>
   </section>

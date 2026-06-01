@@ -1,23 +1,19 @@
 <template>
   <section class="shell products-hero">
     <div>
-      <p class="eyebrow">Products</p>
-      <h1 class="mega">酷里的工具和子产品，会从这里慢慢上线。</h1>
-      <p class="lead">这里是公开产品导航页，只展示可用入口和上线计划，不读取本机项目目录，也不接真实项目管理。</p>
+      <p class="plain-label">产品工具</p>
+      <h1 class="mega">工具会慢慢上线</h1>
+      <p class="lead">这里集中展示可用入口和上线计划，帮助你更快找到当前能用的服务路径</p>
     </div>
     <div class="product-console">
-      <span class="status-dot" />
-      <strong>product.routes</strong>
-      <p>先做服务入口，再逐步补工具。</p>
+      <span class="plain-label">上线顺序</span>
+      <p>先做服务入口，再逐步补工具</p>
     </div>
   </section>
 
   <section class="shell section product-board">
     <article v-for="item in products" :key="item.title" class="product-tile" :class="item.status">
-      <div class="tag-row">
-        <span class="chip">{{ statusLabel[item.status] }}</span>
-        <span class="chip">{{ item.kind }}</span>
-      </div>
+      <p class="plain-label">{{ statusLabel[item.status] }} / {{ item.kind }}</p>
       <h2>{{ item.title }}</h2>
       <p>{{ item.description }}</p>
       <div class="product-actions">
@@ -44,7 +40,7 @@ const products: Array<{ title: string; description: string; kind: string; status
     kind: "订单入口",
     status: "available",
     to: "/note",
-    docs: "/help/quick-start",
+    docs: "/help?doc=quick-start",
     cta: "写小纸条"
   },
   {
@@ -53,7 +49,7 @@ const products: Array<{ title: string; description: string; kind: string; status
     kind: "服务助手",
     status: "beta",
     to: "/help/concepts",
-    docs: "/help/guides",
+    docs: "/help?doc=guides",
     cta: "了解小酷"
   },
   {
@@ -62,7 +58,7 @@ const products: Array<{ title: string; description: string; kind: string; status
     kind: "效率工具",
     status: "planned",
     to: "/services/document-processing",
-    docs: "/help/faq",
+    docs: "/help?doc=faq",
     cta: "看相关服务"
   },
   {
@@ -71,7 +67,7 @@ const products: Array<{ title: string; description: string; kind: string; status
     kind: "上线辅助",
     status: "planned",
     to: "/services/deployment-config",
-    docs: "/help/guides",
+    docs: "/help?doc=guides",
     cta: "查看部署服务"
   }
 ];

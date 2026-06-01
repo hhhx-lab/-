@@ -47,11 +47,8 @@
         <span>参考</span>
         <NuxtLink v-for="citation in citations" :key="citation.to" :to="citation.to">{{ citation.title }}</NuxtLink>
       </div>
-      <div class="xiaoku-quick-actions">
-        <NuxtLink v-for="action in quickActions" :key="action.to + action.label" :to="action.to">{{ action.label }}</NuxtLink>
-      </div>
-      <div v-if="actions.length" class="xiaoku-actions">
-        <NuxtLink v-for="action in actions" :key="action.to + action.label" :to="action.to">{{ action.label }}</NuxtLink>
+      <div v-if="panelActions.length" class="xiaoku-actions">
+        <NuxtLink v-for="action in panelActions" :key="action.to + action.label" :to="action.to">{{ action.label }}</NuxtLink>
       </div>
       <form class="chat-row" @submit.prevent="send">
         <input v-model="message" :disabled="pending" placeholder="问问服务、材料或订单状态" @focus="setState('calm')" />
@@ -93,6 +90,15 @@ const messages = ref<ChatMessage[]>([]);
 const pointer = reactive({ x: 0, y: 0 });
 const offset = reactive({ x: 0, y: 0 });
 const quickActions = computed(() => pageContext(route.path).actions);
+const panelActions = computed(() => {
+  const seen = new Set<string>();
+  return [...quickActions.value, ...actions.value].filter((action) => {
+    const key = `${action.to}::${action.label}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+});
 const stateLabel = computed(() => ({ idle: "online", curious: "scan", thinking: "think", happy: "done", alert: "check", sleep: "sleep", hide: "mini", calm: "calm" })[motionState.value]);
 
 let frame = 0;
@@ -333,7 +339,7 @@ function pageContext(path: string) {
     return { state: "curious" as XiaokuState, text: "你可以先发一个大概需求，我帮你判断材料够不够。", actions: [{ label: "写小纸条", to: `/note?service=${path.split("/").pop()}` }] };
   }
   if (path === "/services") {
-    return { state: "hide" as XiaokuState, text: "不知道选哪类服务的话，可以先问我。", actions: [{ label: "帮我写小纸条", to: "/note" }, { label: "看知识库", to: "/help" }] };
+    return { state: "hide" as XiaokuState, text: "不知道选哪类服务的话，可以先问我。", actions: [{ label: "帮我写小纸条", to: "/note" }, { label: "文档说明", to: "/help" }] };
   }
   if (path.startsWith("/note")) {
     return { state: "hide" as XiaokuState, text: "写不完整也没关系，我可以帮你整理。", actions: [{ label: "查看服务", to: "/services" }] };
@@ -345,7 +351,7 @@ function pageContext(path: string) {
     return { state: "hide" as XiaokuState, text: "我可以帮你解释通知和订单下一步。", actions: [{ label: "我的订单", to: "/orders" }] };
   }
   if (path.startsWith("/legal")) {
-    return { state: "hide" as XiaokuState, text: "这里主要是规则说明，我会安静一点。", actions: [{ label: "上传说明", to: "/legal/upload-policy" }] };
+    return { state: "hide" as XiaokuState, text: "这里主要是规则说明，我会安静一点。", actions: [{ label: "上传说明", to: "/help?doc=upload-policy" }] };
   }
   if (path.startsWith("/admin")) {
     return { state: "hide" as XiaokuState, text: "后台信息密集，我先缩在角落。", actions: [{ label: "订单管理", to: "/admin" }] };

@@ -105,7 +105,7 @@ export function useApi() {
     confirmPasswordReset: (input: { token: string; password: string }) =>
       request<{ ok: boolean; message: string }>("/api/auth/password-reset/confirm", { method: "POST", body: JSON.stringify(input) }),
     getProfile: (token: string) => request<{ profile: UserProfile }>("/api/me/profile", { token }),
-    updateProfile: (token: string, input: { displayName: string }) =>
+    updateProfile: (token: string, input: { displayName: string; otherContact: string }) =>
       request<{ profile: UserProfile }>("/api/me/profile", { method: "PATCH", token, body: JSON.stringify(input) }),
     getMySummary: (token: string) => request<{ summary: UserSummary }>("/api/me/summary", { token }),
     getReferral: (token: string) => request<{ referral: UserReferral }>("/api/me/referral", { token }),
@@ -138,6 +138,12 @@ export function useApi() {
         method: "POST",
         token,
         body: JSON.stringify({ body })
+      }),
+    updateCommunicationPreference: (token: string, orderNumber: string, communicationPreference: "site" | "wecom") =>
+      request<ApiResponse<"/api/orders/{order_number}/communication-preference", "patch">>(`/api/orders/${encodeURIComponent(orderNumber)}/communication-preference`, {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ communicationPreference })
       }),
     acceptOrder: (token: string, orderNumber: string) =>
       request<ApiResponse<"/api/orders/{order_number}/accept", "post">>(`/api/orders/${encodeURIComponent(orderNumber)}/accept`, { method: "POST", token }),
@@ -195,6 +201,7 @@ export function useApi() {
 
 export type User = ApiResponse<"/api/auth/me", "get">["user"];
 export type UserProfile = User & {
+  otherContact: string;
   points: number;
   referralCode: string;
   referredByUserId: string | null;
@@ -212,7 +219,7 @@ export type UserReferral = {
   invitePath: string;
   points: number;
   rewardedInvites: number;
-  rewards: Array<{ id: string; points: number; reason: string; createdAt: string }>;
+  rewards: Array<{ id: string; points: number; reason: string; createdAt: string; referredUser?: { id: string; displayName: string; email: string } | null }>;
 };
 export type NotificationItem = ApiResponse<"/api/notifications", "get">["notifications"][number];
 export type ServiceItem = ApiResponse<"/api/services", "get">["services"][number];

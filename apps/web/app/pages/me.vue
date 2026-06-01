@@ -1,22 +1,35 @@
 <template>
-  <section class="section account-dashboard">
-    <div class="account-hero">
+  <section class="shell app-surface account-dashboard">
+    <header class="account-hero">
       <div>
-        <p class="eyebrow">My Kuli</p>
-        <h1>你的酷里主页。</h1>
-        <p v-if="summary">登录邮箱：{{ summary.profile.email }}</p>
+        <p class="plain-label">我的酷里</p>
+        <h1 class="page-title">我的酷里</h1>
+        <p v-if="summary">当前账号：{{ summary.profile.email }}</p>
       </div>
-      <NuxtLink class="button" to="/note">写新的小纸条</NuxtLink>
-    </div>
+      <div class="empty-actions">
+        <NuxtLink class="button" to="/note">写新的小纸条</NuxtLink>
+        <NuxtLink class="button secondary" to="/orders">订单工作台</NuxtLink>
+      </div>
+    </header>
 
-    <div v-if="summary" class="dashboard-grid">
-      <article class="panel profile-panel">
-        <span class="chip">账号</span>
-        <h2>{{ summary.profile.displayName }}</h2>
-        <p>{{ summary.profile.role === "admin" ? "管理员账号" : "普通账号" }}</p>
+    <div v-if="summary" class="dashboard-overview">
+      <article class="panel profile-panel account-main-card">
+        <span class="plain-label">账号</span>
+        <div class="account-main-head">
+          <div>
+            <h2>{{ summary.profile.displayName }}</h2>
+            <p>{{ summary.profile.role === "admin" ? "管理员账号" : "普通账号" }}</p>
+          </div>
+          <div class="account-quick-stats">
+            <span><strong>{{ summary.orders.total }}</strong>订单</span>
+            <span><strong>{{ unreadCount }}</strong>未读</span>
+            <span><strong>{{ summary.points.current }}</strong>积分</span>
+          </div>
+        </div>
         <dl>
           <div><dt>邮箱</dt><dd>{{ summary.profile.email }}</dd></div>
-          <div><dt>注册时间</dt><dd>{{ formatDate(summary.profile.createdAt) }}</dd></div>
+          <div><dt>其他联系方式</dt><dd>{{ summary.profile.otherContact || "未填写" }}</dd></div>
+          <div><dt>注册时间</dt><dd>{{ display.date(summary.profile.createdAt) }}</dd></div>
           <div>
             <dt>邮箱验证</dt>
             <dd>
@@ -30,41 +43,29 @@
         <p v-if="verificationMessage" class="form-success">{{ verificationMessage }}</p>
       </article>
 
-      <article class="panel points-panel">
-        <span class="chip">积分进度</span>
+      <article class="panel points-panel account-side-card">
+        <span class="plain-label">积分</span>
         <h2>{{ summary.points.current }} / {{ summary.points.nextLevel }}</h2>
         <div class="progress-track"><span :style="{ width: `${summary.points.progress}%` }" /></div>
         <p>邀请注册、完善资料、完成订单都可以作为后续积分来源。</p>
         <NuxtLink class="button secondary" to="/referrals">邀请注册</NuxtLink>
       </article>
-
-      <article class="panel order-summary-panel">
-        <span class="chip">我的订单</span>
-        <h2>{{ summary.orders.total }} 单</h2>
-        <div class="mini-stats">
-          <span v-for="(count, status) in summary.orders.byStatus" :key="status">{{ status }} · {{ count }}</span>
-        </div>
-        <NuxtLink class="button secondary" to="/orders">进入订单工作台</NuxtLink>
-      </article>
-
-      <article class="panel notifications-panel">
-        <span class="chip">通知</span>
-        <h2>{{ unreadCount }} 条未读</h2>
-        <p>管理员回复、报价和交付提醒会同步进入通知中心。</p>
-        <NuxtLink class="button secondary" to="/notifications">查看通知</NuxtLink>
-      </article>
     </div>
 
-    <section v-if="summary" class="section account-section">
-      <div class="section-head">
-        <h2>最近订单</h2>
+    <section v-if="summary" class="account-section">
+      <div class="section-head compact">
+        <h2 class="compact-title">最近订单</h2>
         <NuxtLink class="button secondary" to="/orders">全部订单</NuxtLink>
       </div>
-      <div class="order-list">
-        <NuxtLink v-for="order in summary.recentOrders" :key="order.orderNumber" class="order-card" :to="`/orders/${order.orderNumber}`">
-          <span>{{ order.status }}</span>
-          <strong>{{ order.orderNumber }} · {{ order.title }}</strong>
-          <small>下一步：{{ order.nextAction }}</small>
+      <div class="orders-table">
+        <NuxtLink v-for="order in summary.recentOrders" :key="order.orderNumber" class="orders-row" :to="`/orders/${order.orderNumber}`">
+          <div>
+            <strong>{{ order.title }}</strong>
+            <p>{{ order.orderNumber }}</p>
+          </div>
+          <span class="status-pill" :class="display.orderStatus(order.status).tone">{{ display.orderStatus(order.status).label }}</span>
+          <p>{{ order.nextAction }}</p>
+          <small>{{ display.dateTime(order.updatedAt) }}</small>
         </NuxtLink>
         <div v-if="summary.recentOrders.length === 0" class="empty-state">
           <strong>还没有订单。</strong>
@@ -73,9 +74,9 @@
       </div>
     </section>
 
-    <section v-if="recentNotifications.length" class="section account-section">
-      <div class="section-head">
-        <h2>最近通知</h2>
+    <section v-if="recentNotifications.length" class="account-section">
+      <div class="section-head compact">
+        <h2 class="compact-title">最近通知</h2>
         <NuxtLink class="button secondary" to="/notifications">通知中心</NuxtLink>
       </div>
       <div class="notification-strip">
@@ -94,6 +95,7 @@ import type { NotificationItem, UserSummary } from "~/composables/useApi";
 
 const auth = useAuthStore();
 const api = useApi();
+const display = useDisplayText();
 const summary = ref<UserSummary | null>(null);
 const recentNotifications = ref<NotificationItem[]>([]);
 const verificationBusy = ref(false);
@@ -107,10 +109,6 @@ onMounted(async () => {
     recentNotifications.value = (await api.listNotifications(auth.token)).notifications.slice(0, 3);
   }
 });
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("zh-CN");
-}
 
 async function requestVerification() {
   if (!auth.token) return;

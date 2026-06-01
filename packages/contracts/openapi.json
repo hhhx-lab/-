@@ -63,6 +63,10 @@
             "title": "Category",
             "type": "string"
           },
+          "communicationPreference": {
+            "title": "Communicationpreference",
+            "type": "string"
+          },
           "contact": {
             "title": "Contact",
             "type": "string"
@@ -251,6 +255,7 @@
           "urgency",
           "budget",
           "remoteHelp",
+          "communicationPreference",
           "intent",
           "missingFields",
           "serviceConfidence",
@@ -865,6 +870,20 @@
           "createdAt"
         ],
         "title": "AutomationSuggestionOut",
+        "type": "object"
+      },
+      "CommunicationPreferenceInput": {
+        "properties": {
+          "communicationPreference": {
+            "pattern": "^(site|wecom)$",
+            "title": "Communicationpreference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "communicationPreference"
+        ],
+        "title": "CommunicationPreferenceInput",
         "type": "object"
       },
       "DeliverableInput": {
@@ -1833,6 +1852,10 @@
             "title": "Category",
             "type": "string"
           },
+          "communicationPreference": {
+            "title": "Communicationpreference",
+            "type": "string"
+          },
           "contact": {
             "title": "Contact",
             "type": "string"
@@ -1973,6 +1996,7 @@
           "urgency",
           "budget",
           "remoteHelp",
+          "communicationPreference",
           "intent",
           "missingFields",
           "serviceConfidence",
@@ -5023,6 +5047,71 @@
           }
         },
         "summary": "Download Order Attachment"
+      }
+    },
+    "/api/orders/{order_number}/communication-preference": {
+      "patch": {
+        "operationId": "update_communication_preference_api_orders__order_number__communication_preference_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_number",
+            "required": true,
+            "schema": {
+              "title": "Order Number",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunicationPreferenceInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderEnvelope"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Communication Preference"
       }
     },
     "/api/orders/{order_number}/messages": {
