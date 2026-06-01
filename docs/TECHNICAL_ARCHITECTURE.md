@@ -148,6 +148,7 @@ flowchart LR
 
 - `/api/health` 只表示 API 进程存活。
 - `/api/health/deps` 返回数据库、Redis、对象存储、邮件 provider、LLM 和 RAG 的结构化状态。
+- `/api/dev/reset-security-rate-limits` 仅在 `local/dev/development/test` 环境可用，用于清空内存态注册/Agent 限流，避免本地浏览器 smoke 或手工调试被前一次试跑污染；生产环境返回 404。
 - local 环境允许 Redis、邮件和远程 LLM 降级，便于只跑前后端和 SQLite fallback。
 - staging/production 环境把 Redis、对象存储、邮件等发布依赖标记为必需；任一必需项失败时 `ok` 为 `false`，但接口仍返回 200，便于监控系统采集完整故障原因。
 - RAG 健康状态根据知识文章、chunk 和 embedding 数量区分 `remote-rag` 与 `local-rules-fallback`，知识索引失败时不阻塞主站启动，但会在依赖检查中暴露。
@@ -218,7 +219,7 @@ npm run dev
 npm run smoke:browser
 ```
 
-`smoke:browser` 使用本机 Chrome 检查桌面/移动页面渲染、小酷浮层和对话入口、服务详情跳转、小纸条提交、普通用户订单隔离以及管理员搜索。
+`smoke:browser` 使用本机 Chrome 检查桌面/移动页面渲染、小酷浮层和对话入口、服务详情跳转、小纸条提交、普通用户订单隔离、个人中心、管理员搜索与详情处理、支付页、通知中心。脚本会在本地环境先调用 `/api/dev/reset-security-rate-limits`，再创建临时普通用户并跑完整业务链路。
 
 生产栈联调验证：
 

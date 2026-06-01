@@ -109,6 +109,7 @@ from app.services.security_controls import (
     record_failed_login,
     record_security_event,
     record_successful_login,
+    reset_security_rate_limits,
     validate_password,
 )
 from app.services.storage import create_presigned_download, create_presigned_upload, local_object_path, verify_local_download_signature
@@ -485,6 +486,14 @@ def health() -> dict[str, object]:
 @app.get("/api/health/deps", response_model=HealthDepsOut)
 def health_deps(db: Session = Depends(get_db)) -> dict[str, object]:
     return dependency_report(db, get_settings())
+
+
+@app.post("/api/dev/reset-security-rate-limits", response_model=StatusOut)
+def reset_security_limits() -> dict[str, object]:
+    if settings.app_env not in {"local", "dev", "development", "test"}:
+        raise HTTPException(status_code=404, detail="Not found")
+    reset_security_rate_limits()
+    return {"ok": True, "message": "安全限流状态已重置"}
 
 
 @app.get("/api/services", response_model=ServicesOut)

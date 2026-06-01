@@ -25,6 +25,20 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
+@pytest.fixture(autouse=True)
+def reset_mail_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MAIL_PROVIDER", "")
+    monkeypatch.setenv("MAIL_FROM", "")
+    monkeypatch.setenv("MAIL_REPLY_TO", "")
+    monkeypatch.setenv("SMTP_HOST", "")
+    monkeypatch.setenv("SMTP_PORT", "587")
+    monkeypatch.setenv("SMTP_USERNAME", "")
+    monkeypatch.setenv("SMTP_PASSWORD", "")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
 async def login(client: httpx.AsyncClient, email: str, password: str) -> str:
     response = await client.post("/api/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200

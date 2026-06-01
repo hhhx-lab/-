@@ -62,6 +62,15 @@
 - `frontend/`：旧 Vite/React 前端，已由 `apps/web` 替代。
 - `backend/`：旧 Node.js 后端，已由 `apps/api` 替代。
 
+最近一次本地联调已实际验证通过：
+
+- `npm run typecheck`
+- `npm run test:api`
+- `npm run build`
+- `npm run smoke:browser`
+
+其中浏览器 smoke 已覆盖桌面与移动端公开页面、小酷入口、登录门禁、小纸条提交、普通用户订单详情、管理员订单管理、支付页与通知中心。
+
 ## 前后端入口
 
 | 部分 | 目录 | 技术栈 | 主要职责 |

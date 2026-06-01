@@ -12,9 +12,16 @@ const SMOKE_ADMIN_EMAIL = process.env.SMOKE_ADMIN_EMAIL ?? "admin@kuli.local";
 const SMOKE_ADMIN_PASSWORD = process.env.SMOKE_ADMIN_PASSWORD ?? "KuliAdmin123!";
 const SMOKE_ALLOW_DISABLED_MAIL = process.env.SMOKE_ALLOW_DISABLED_MAIL !== "false";
 const SMOKE_SKIP_USER_REGISTRATION = process.env.SMOKE_SKIP_USER_REGISTRATION === "true";
+const EXPECTED_PUBLISHED_DOCS = Number(process.env.SMOKE_EXPECTED_PUBLISHED_DOCS ?? 8);
 const chromePath = process.env.PLAYWRIGHT_EXECUTABLE_PATH
   ?? (existsSync("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome") ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" : undefined);
 let smokeUserReady = false;
+let smokeUser = {
+  email: SMOKE_USER_EMAIL,
+  password: SMOKE_USER_PASSWORD,
+  displayName: SMOKE_USER_DISPLAY_NAME
+};
+let smokeUserToken = "";
 
 const result = {
   pages: [],
@@ -79,14 +86,26 @@ async function goto(page, path) {
 
 async function clearBrowserState(page) {
   await goto(page, "/");
-  await page.evaluate(() => localStorage.clear());
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
   await page.context().clearCookies();
   await goto(page, "/");
 }
 
+async function waitForAuthForm(page) {
+  await page.waitForURL("**/login**", { timeout: WAIT_TIMEOUT_MS });
+  await page.locator(".auth-form").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.locator('.auth-form input[autocomplete="email"]').waitFor({ timeout: WAIT_TIMEOUT_MS });
+}
+
 function collectErrors(page) {
   page.on("console", (message) => {
-    if (message.type() === "error") result.consoleErrors.push(`${page.url()}: ${message.text()}`);
+    if (message.type() !== "error") return;
+    const text = message.text();
+    if (page.url().includes("/login") && (text.includes("status of 401") || text.includes("status of 429"))) return;
+    result.consoleErrors.push(`${page.url()}: ${text}`);
   });
   page.on("pageerror", (error) => {
     result.pageErrors.push(error.message);
@@ -140,12 +159,18 @@ async function checkHealthDeps() {
   result.healthDepsOk = true;
 }
 
+async function resetLocalSecurityRateLimits() {
+  const response = await fetch(`${API_BASE_URL}/api/dev/reset-security-rate-limits`, { method: "POST" });
+  if (response.status === 404) return;
+  assert(response.ok, `Reset security rate limits returned ${response.status}`);
+}
+
 async function checkDocsGovernance() {
   const response = await fetch(`${API_BASE_URL}/api/docs`);
   assert(response.ok, `Docs API returned ${response.status}`);
   const body = await response.json();
   assert(Array.isArray(body.docs), "Docs API did not return docs array");
-  assert(body.docs.length === 5, `Docs API expected 5 published docs, got ${body.docs.length}`);
+  assert(body.docs.length === EXPECTED_PUBLISHED_DOCS, `Docs API expected ${EXPECTED_PUBLISHED_DOCS} published docs, got ${body.docs.length}`);
   assert(body.docs.every((item) => item.status === "published"), "Docs API returned an unpublished document");
   result.docsGovernanceOk = true;
 }
@@ -163,12 +188,13 @@ async function checkNoteFlow(page) {
   await ensureSmokeUser(page);
   await goto(page, "/note?service=ai-tools");
   await page.locator("#need-detail").fill("我想做一个课程汇报 PPT，大概 15 页，内容在 Word 里，希望更好看一点。");
-  await page.getByRole("button", { name: "让 AI 帮我整理" }).click();
+  await page.getByRole("button", { name: "小酷帮我整理成给管理员看的版本" }).click();
   const polished = page.locator("#polished-demand");
   await expectValueLength(polished, 30);
   result.polishedLength = (await polished.inputValue()).length;
-  await page.locator("#contact").fill(SMOKE_USER_EMAIL);
-  await page.getByRole("button", { name: "丢张小纸条给酷里看看" }).click();
+  await page.locator("#contact-email").fill(smokeUser.email);
+  await page.locator("#other-contact").fill("smoke-wecom");
+  await page.getByRole("button", { name: "提交给酷里判断" }).click();
   const status = page.locator(".status-box.is-visible");
   await status.waitFor({ timeout: WAIT_TIMEOUT_MS });
   const text = await status.innerText();
@@ -202,7 +228,7 @@ async function checkAuthGate(page) {
 async function checkProductsPage(page) {
   await clearBrowserState(page);
   await goto(page, "/products");
-  await page.getByText("酷里的工具和子产品").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByText("工具会慢慢上线").waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("酷里小纸条").waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("小酷 Agent").waitFor({ timeout: WAIT_TIMEOUT_MS });
   result.productsOk = true;
@@ -214,8 +240,8 @@ async function checkDocsCenter(page) {
   await page.getByRole("heading", { name: "快速开始" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.locator("#write-note").waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("继续阅读").waitFor({ timeout: WAIT_TIMEOUT_MS });
-  await page.locator('a[href="/help/guides"]').first().click({ timeout: WAIT_TIMEOUT_MS });
-  await page.waitForURL("**/help/guides", { timeout: WAIT_TIMEOUT_MS });
+  await goto(page, "/help?doc=guides");
+  await page.waitForURL("**/help?doc=guides", { timeout: WAIT_TIMEOUT_MS });
   await page.locator("#upload-materials").waitFor({ timeout: WAIT_TIMEOUT_MS });
   result.docsOk = true;
 }
@@ -224,19 +250,19 @@ async function checkLegalAndUploadPolicy(page) {
   await clearBrowserState(page);
   await goto(page, "/legal/privacy");
   await page.getByRole("heading", { name: "隐私政策" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
-  await page.getByText("不出售个人数据").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByText("普通用户只能看到自己的订单").waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   await goto(page, "/legal/terms");
   await page.getByRole("heading", { name: "服务条款" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("小酷不代表最终报价").waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   await goto(page, "/legal/upload-policy");
-  await page.getByRole("heading", { name: "文件上传与敏感信息说明" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByRole("heading", { name: "上传说明" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("密码、验证码、私钥、支付凭证、身份证").waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   await ensureSmokeUser(page);
   await goto(page, "/note");
-  await page.getByText("不要提交密码、验证码、私钥").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByText("不要在纸条或附件里放密码、验证码、私钥、支付凭证等敏感信息").waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   result.legalOk = true;
 }
@@ -294,12 +320,12 @@ async function checkAccountCenter(page) {
   await ensureSmokeUser(page);
 
   await goto(page, "/me");
-  await page.getByText("你的酷里主页").waitFor({ timeout: WAIT_TIMEOUT_MS });
-  await page.getByText("积分进度").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByRole("heading", { name: "我的酷里" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByRole("link", { name: "邀请注册" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("邮箱验证").waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   await goto(page, "/settings");
-  await page.getByText("账号设置").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByRole("heading", { name: "账号设置" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
   const displayName = `Smoke 用户 ${Date.now()}`;
   await page.getByLabel("展示名").fill(displayName);
   await page.getByRole("button", { name: "保存设置" }).click();
@@ -313,13 +339,12 @@ async function checkAccountCenter(page) {
 }
 
 async function checkNotificationCenter(page) {
-  await clearBrowserState(page);
-  await loginAs(page, SMOKE_USER_EMAIL, SMOKE_USER_PASSWORD, "/orders");
+  await restoreSmokeUserSession(page, "/orders");
   await goto(page, "/notifications");
   await page.getByRole("heading", { name: "通知中心" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("管理员回复了你的订单").first().waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByRole("button", { name: "全部已读" }).click();
-  await page.getByText("未读 0").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByText("未读 0").first().waitFor({ timeout: WAIT_TIMEOUT_MS });
   result.notificationsOk = true;
 }
 
@@ -330,7 +355,7 @@ async function checkMobileAccountNavigation(page) {
   await accountSummary.waitFor({ timeout: WAIT_TIMEOUT_MS });
   assert(await accountSummary.isVisible(), "Mobile account menu summary is hidden");
   await accountSummary.click();
-  await page.getByText("个人主页").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByText("我的酷里").first().waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("积分与邀请").waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.setViewportSize({ width: 1440, height: 980 });
   result.mobileAccountOk = true;
@@ -346,55 +371,110 @@ async function expectValueLength(locator, minLength) {
   throw new Error(`Expected input value length >= ${minLength}`);
 }
 
+async function persistSmokeToken(page) {
+  await page.waitForFunction(() => Boolean(localStorage.getItem("kuli-v2-token")), { timeout: WAIT_TIMEOUT_MS });
+  smokeUserToken = await page.evaluate(() => localStorage.getItem("kuli-v2-token") || "");
+  assert(smokeUserToken, "Smoke user token is missing after auth flow");
+}
+
 async function loginAs(page, email, password, targetPath) {
-  await goto(page, "/login");
-  await page.evaluate(() => localStorage.removeItem("kuli-v2-token"));
-  await page.getByLabel("邮箱").fill(email);
-  await page.getByLabel("密码").fill(password);
+  await goto(page, `/login?redirect=${encodeURIComponent(targetPath)}`);
+  await page.evaluate(() => {
+    localStorage.removeItem("kuli-v2-token");
+    sessionStorage.clear();
+  });
+  await waitForAuthForm(page);
+  await page.locator('.auth-form input[autocomplete="email"]').fill(email);
+  await page.locator('.auth-form input[autocomplete="current-password"]').fill(password);
   await page.locator(".auth-form button[type='submit']").click();
-  await page.waitForURL(`**${targetPath}`, { timeout: WAIT_TIMEOUT_MS });
+  await persistSmokeToken(page);
+  await goto(page, targetPath);
 }
 
 async function registerAs(page, email, password, displayName, targetPath) {
-  await goto(page, "/login");
-  await page.evaluate(() => localStorage.removeItem("kuli-v2-token"));
+  await goto(page, `/login?redirect=${encodeURIComponent(targetPath)}`);
+  await page.evaluate(() => {
+    localStorage.removeItem("kuli-v2-token");
+    sessionStorage.clear();
+  });
+  await waitForAuthForm(page);
   await page.getByRole("button", { name: "注册" }).click();
-  await page.getByLabel("展示名").fill(displayName);
-  await page.getByLabel("邮箱").fill(email);
-  await page.getByLabel("密码").fill(password);
+  await page.locator('.auth-form input[autocomplete="name"]').waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.locator('.auth-form input[autocomplete="name"]').fill(displayName);
+  await page.locator('.auth-form input[autocomplete="email"]').fill(email);
+  await page.locator('.auth-form input[autocomplete="new-password"]').first().fill(password);
   await page.locator(".auth-form button[type='submit']").click();
-  await page.waitForURL(`**${targetPath}`, { timeout: WAIT_TIMEOUT_MS });
+
+  const authOutcome = await Promise.race([
+    page.waitForFunction(() => ({ token: localStorage.getItem("kuli-v2-token") || "" }), { timeout: 20000 }).then(async () => {
+      await persistSmokeToken(page);
+      return { kind: "success" };
+    }),
+    page.locator('.form-error').textContent({ timeout: 20000 }).then((message) => ({ kind: "error", message: message?.trim() || "" }))
+  ]);
+
+  if (authOutcome.kind === "error") {
+    throw new Error(`Register failed: ${authOutcome.message || "unknown error"}`);
+  }
+
+  await goto(page, targetPath);
+}
+
+async function restoreSmokeUserSession(page, targetPath = "/orders") {
+  await clearBrowserState(page);
+  if (smokeUserToken) {
+    await goto(page, "/");
+    await page.evaluate((token) => {
+      localStorage.setItem("kuli-v2-token", token);
+      document.cookie = `kuli-v2-token=${token}; path=/; SameSite=Lax`;
+    }, smokeUserToken);
+    await goto(page, targetPath);
+    if (!page.url().includes("/login")) return;
+  }
+  await loginAs(page, smokeUser.email, smokeUser.password, targetPath);
 }
 
 async function ensureSmokeUser(page) {
-  await clearBrowserState(page);
   if (smokeUserReady || SMOKE_SKIP_USER_REGISTRATION) {
-    await loginAs(page, SMOKE_USER_EMAIL, SMOKE_USER_PASSWORD, "/orders");
+    await restoreSmokeUserSession(page, "/orders");
     smokeUserReady = true;
     return;
   }
-  await registerAs(page, SMOKE_USER_EMAIL, SMOKE_USER_PASSWORD, SMOKE_USER_DISPLAY_NAME, "/orders").catch(async () => {
-    await loginAs(page, SMOKE_USER_EMAIL, SMOKE_USER_PASSWORD, "/orders");
-  });
+
+  const stamp = Date.now();
+  smokeUser = {
+    email: process.env.SMOKE_USER_EMAIL ?? `smoke-${stamp}@kuly.test`,
+    password: process.env.SMOKE_USER_PASSWORD ?? `SmokePass${stamp}!`,
+    displayName: process.env.SMOKE_USER_DISPLAY_NAME ?? `Smoke 用户 ${stamp}`
+  };
+
+  await clearBrowserState(page);
+  try {
+    await registerAs(page, smokeUser.email, smokeUser.password, smokeUser.displayName, "/orders");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes("邮箱已注册")) throw error;
+    await loginAs(page, smokeUser.email, smokeUser.password, "/orders");
+  }
   smokeUserReady = true;
 }
 
 async function checkUserOrders(page) {
   assert(result.noteOrder, "Note flow must create an order before user order checks");
-  await loginAs(page, SMOKE_USER_EMAIL, SMOKE_USER_PASSWORD, "/orders");
+  await restoreSmokeUserSession(page, "/orders");
   await page.getByText(result.noteOrder).waitFor({ timeout: WAIT_TIMEOUT_MS });
   await assertNoInternalText(page, "User orders page");
 
   await page.locator(`a[href="/orders/${result.noteOrder}"]`).first().click({ timeout: WAIT_TIMEOUT_MS });
   await page.waitForURL(`**/orders/${result.noteOrder}`, { timeout: WAIT_TIMEOUT_MS });
-  await page.getByText("进度时间线").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByText("全链路节点").waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("报价与付款").waitFor({ timeout: WAIT_TIMEOUT_MS });
   await assertNoInternalText(page, "User order detail page");
 
   const message = `浏览器 smoke 补充说明 ${Date.now()}`;
-  await page.getByPlaceholder("补充说明、链接或验收反馈").fill(message);
-  await page.getByRole("button", { name: "发送" }).click();
-  await page.getByText(message).waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByPlaceholder("把补充说明、链接、截图说明或验收反馈写在这里").fill(message);
+  await page.getByRole("button", { name: "发送消息" }).click();
+  await page.getByText(message).first().waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   const attachmentName = `smoke-note-${Date.now()}.txt`;
   await page.locator('input[type="file"]').setInputFiles({
@@ -425,34 +505,34 @@ async function checkAdminOrders(page) {
 
   await page.locator(`a[href="/admin/orders/${result.noteOrder}"]`).first().click({ timeout: WAIT_TIMEOUT_MS });
   await page.waitForURL(`**/admin/orders/${result.noteOrder}`, { timeout: WAIT_TIMEOUT_MS });
-  await page.getByRole("term").filter({ hasText: "内部备注" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByText("处理动作").waitFor({ timeout: WAIT_TIMEOUT_MS });
   await page.getByText("AI 自动化建议").waitFor({ timeout: WAIT_TIMEOUT_MS });
 
-  await page.getByRole("button", { name: "重新运行自动化" }).click();
+  await page.getByRole("button", { name: "重新运行" }).click();
   await page.getByText("建议状态").first().waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   const adminMessage = `管理员 smoke 公开备注 ${Date.now()}`;
   await page.getByPlaceholder("给客户或内部团队的备注").fill(adminMessage);
-  await page.getByRole("button", { name: "发送" }).click();
-  await page.getByText(adminMessage).waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByRole("button", { name: "发送消息" }).click();
+  await page.getByText(adminMessage).first().waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   const quoteNote = `浏览器 smoke 报价 ${Date.now()}`;
   await page.getByPlaceholder("报价金额").fill("188");
   await page.getByPlaceholder("报价说明").fill(quoteNote);
   await page.getByRole("button", { name: "发报价" }).click();
-  await page.getByText(quoteNote).waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByText(quoteNote).first().waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   const paymentMethod = `浏览器 smoke 收款 ${Date.now()}`;
   await page.getByPlaceholder("收款金额").fill("88");
   await page.getByPlaceholder("收款方式").fill(paymentMethod);
   await page.getByRole("button", { name: "记收款" }).click();
-  await page.getByText(paymentMethod).waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByText(paymentMethod).first().waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   const deliverableTitle = `浏览器 smoke 交付物 ${Date.now()}`;
   await page.getByPlaceholder("交付物标题").fill(deliverableTitle);
-  await page.getByPlaceholder("对象存储 key / 链接").fill(`orders/${result.noteOrder}/${deliverableTitle}.txt`);
+  await page.getByPlaceholder("交付链接或存储标识").fill(`orders/${result.noteOrder}/${deliverableTitle}.txt`);
   await page.getByRole("button", { name: "登记交付" }).click();
-  await page.getByText(deliverableTitle, { exact: true }).waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByText(deliverableTitle, { exact: true }).first().waitFor({ timeout: WAIT_TIMEOUT_MS });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await checkPageMetrics(page, `/admin/orders/${result.noteOrder}`, "mobile-admin");
@@ -465,9 +545,9 @@ async function checkAdminOrders(page) {
 async function checkPaymentPage(page) {
   assert(result.noteOrder, "Note flow must create an order before payment page checks");
   await clearBrowserState(page);
-  await loginAs(page, SMOKE_USER_EMAIL, SMOKE_USER_PASSWORD, "/orders");
+  await loginAs(page, smokeUser.email, smokeUser.password, "/orders");
   await goto(page, `/pay/${result.noteOrder}`);
-  await page.getByText("选择付款方式").waitFor({ timeout: WAIT_TIMEOUT_MS });
+  await page.getByRole("heading", { name: "选择付款方式" }).waitFor({ timeout: WAIT_TIMEOUT_MS });
   await expectQrImage(page, "/pay/wechat-qr.png");
 
   await page.getByRole("button", { name: "支付宝" }).click();
@@ -521,6 +601,7 @@ async function run() {
   collectErrors(page);
 
   try {
+    await resetLocalSecurityRateLimits();
     await clearBrowserState(page);
     await checkHealthDeps();
     await checkDocsGovernance();

@@ -87,6 +87,8 @@
 <script setup lang="ts">
 import type { DocDetail, DocSummary } from "~/composables/useApi";
 import type { DocSearchResult } from "~/composables/useApi";
+import { useDisplayText } from "~/composables/useDisplayText";
+import { useMarkdown } from "~/composables/useMarkdown";
 
 const api = useApi();
 const route = useRoute();

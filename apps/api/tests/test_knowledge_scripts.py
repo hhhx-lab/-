@@ -7,6 +7,7 @@ from app.models.entities import KnowledgeArticle, KnowledgeChunk, KnowledgeEmbed
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+EXPECTED_DOC_COUNT = 8
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -18,8 +19,8 @@ def test_index_knowledge_upserts_docs_with_chunk_metadata(tmp_path: Path) -> Non
     init_database()
 
     result = index_knowledge()
-    assert result["articles"] == 5
-    assert result["chunks"] >= 5
+    assert result["articles"] == EXPECTED_DOC_COUNT
+    assert result["chunks"] >= EXPECTED_DOC_COUNT
 
     with database.SessionLocal() as db:
       article = db.query(KnowledgeArticle).filter(KnowledgeArticle.source == "doc:quick-start").one()
@@ -40,9 +41,9 @@ def test_index_knowledge_upserts_docs_with_chunk_metadata(tmp_path: Path) -> Non
       assert all(item.embedding_json != "[]" for item in embeddings)
 
     again = index_knowledge()
-    assert again["articles"] == 5
+    assert again["articles"] == EXPECTED_DOC_COUNT
     with database.SessionLocal() as db:
-      assert db.query(KnowledgeArticle).filter(KnowledgeArticle.source.like("doc:%")).count() == 5
+      assert db.query(KnowledgeArticle).filter(KnowledgeArticle.source.like("doc:%")).count() == EXPECTED_DOC_COUNT
 
 
 def test_knowledge_doctor_reports_required_docs_and_fallback_mode(tmp_path: Path) -> None:
@@ -57,11 +58,11 @@ def test_knowledge_doctor_reports_required_docs_and_fallback_mode(tmp_path: Path
     assert report["ok"] is True
     assert report["mode"] == "local-rules-fallback"
     assert report["requiredDocs"]["missing"] == []
-    assert report["frontmatter"]["ok"] == 5
-    assert report["frontmatter"]["statuses"]["published"] == 5
+    assert report["frontmatter"]["ok"] == EXPECTED_DOC_COUNT
+    assert report["frontmatter"]["statuses"]["published"] == EXPECTED_DOC_COUNT
     assert report["frontmatter"]["missingRequired"] == {}
     assert report["frontmatter"]["invalidStatus"] == []
-    assert report["chunks"]["total"] >= 5
+    assert report["chunks"]["total"] >= EXPECTED_DOC_COUNT
     assert report["embeddings"]["dimension"] > 0
 
 

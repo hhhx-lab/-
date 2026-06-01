@@ -153,6 +153,8 @@
 </template>
 
 <script setup lang="ts">
+import { useDisplayText } from "~/composables/useDisplayText";
+
 const route = useRoute();
 const api = useApi();
 const display = useDisplayText();

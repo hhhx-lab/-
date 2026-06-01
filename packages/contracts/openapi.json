@@ -2724,6 +2724,10 @@
             "title": "Id",
             "type": "string"
           },
+          "otherContact": {
+            "title": "Othercontact",
+            "type": "string"
+          },
           "points": {
             "title": "Points",
             "type": "integer"
@@ -2753,6 +2757,7 @@
           "email",
           "role",
           "displayName",
+          "otherContact",
           "points",
           "referralCode",
           "referredByUserId",
@@ -2768,6 +2773,12 @@
             "maxLength": 80,
             "minLength": 1,
             "title": "Displayname",
+            "type": "string"
+          },
+          "otherContact": {
+            "default": "",
+            "maxLength": 120,
+            "title": "Othercontact",
             "type": "string"
           }
         },
@@ -4009,6 +4020,24 @@
           }
         },
         "summary": "Register"
+      }
+    },
+    "/api/dev/reset-security-rate-limits": {
+      "post": {
+        "operationId": "reset_security_limits_api_dev_reset_security_rate_limits_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reset Security Limits"
       }
     },
     "/api/docs": {

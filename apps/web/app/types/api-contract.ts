@@ -145,9 +145,9 @@ export type UserOut = { id: string; email: string; role: string; displayName: st
 
 export type UserProfileEnvelope = { profile: UserProfileOut };
 
-export type UserProfileOut = { id: string; email: string; role: string; displayName: string; points: number; referralCode: string; referredByUserId: string | null; emailVerifiedAt: string | null; createdAt: string };
+export type UserProfileOut = { id: string; email: string; role: string; displayName: string; otherContact: string; points: number; referralCode: string; referredByUserId: string | null; emailVerifiedAt: string | null; createdAt: string };
 
-export type UserProfilePatch = { displayName: string };
+export type UserProfilePatch = { displayName: string; otherContact?: string };
 
 export type UserReferralEnvelope = { referral: Record<string, unknown> };
 
@@ -213,6 +213,9 @@ export type ApiPaths = {
   };
   "/api/auth/register": {
     post: { request: RegisterIn; response: AuthOut };
+  };
+  "/api/dev/reset-security-rate-limits": {
+    post: { response: StatusOut };
   };
   "/api/docs": {
     get: { response: DocsOut };

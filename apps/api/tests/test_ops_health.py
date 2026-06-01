@@ -24,6 +24,18 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
+@pytest.fixture(autouse=True)
+def reset_optional_dep_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MAIL_PROVIDER", "")
+    monkeypatch.setenv("MAIL_FROM", "")
+    monkeypatch.setenv("MAIL_REPLY_TO", "")
+    monkeypatch.setenv("SMTP_HOST", "")
+    monkeypatch.setenv("SMTP_PORT", "587")
+    monkeypatch.setenv("SMTP_USERNAME", "")
+    monkeypatch.setenv("SMTP_PASSWORD", "")
+    yield
+
+
 @pytest.mark.anyio
 async def test_health_deps_reports_required_and_degraded_dependencies(client: httpx.AsyncClient) -> None:
     response = await client.get("/api/health/deps")

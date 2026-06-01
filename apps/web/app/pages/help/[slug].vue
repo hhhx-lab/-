@@ -30,6 +30,8 @@
 
 <script setup lang="ts">
 import type { DocDetail, DocSummary } from "~/composables/useApi";
+import { useDisplayText } from "~/composables/useDisplayText";
+import { useMarkdown } from "~/composables/useMarkdown";
 
 const route = useRoute();
 const api = useApi();

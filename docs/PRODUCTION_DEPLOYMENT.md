@@ -175,6 +175,8 @@ SMOKE_ADMIN_PASSWORD='从 /opt/kuly/ADMIN_CREDENTIALS.txt 读取' \
 npm run smoke:browser
 ```
 
+如果在本地开发环境反复执行 smoke，脚本会先调用 `/api/dev/reset-security-rate-limits` 清理内存态限流桶；该接口只在本地/测试环境开放，线上不会暴露。
+
 也可以指定固定测试用户：
 
 ```bash

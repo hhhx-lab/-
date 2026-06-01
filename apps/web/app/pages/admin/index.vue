@@ -56,6 +56,7 @@
 
 <script setup lang="ts">
 import type { AdminOrder } from "~/composables/useApi";
+import { useDisplayText } from "~/composables/useDisplayText";
 
 const auth = useAuthStore();
 const api = useApi();

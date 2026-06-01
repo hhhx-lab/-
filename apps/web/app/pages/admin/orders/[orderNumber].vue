@@ -299,6 +299,7 @@
 
 <script setup lang="ts">
 import type { AdminOrder, AdminOrderPatch, OrderAttachment, OrderMessage } from "~/composables/useApi";
+import { useDisplayText } from "~/composables/useDisplayText";
 
 const route = useRoute();
 const auth = useAuthStore();

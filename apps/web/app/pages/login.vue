@@ -95,12 +95,17 @@ const resetEmail = ref("");
 const resetPassword = ref("");
 const resetToken = ref(String(route.query.resetToken ?? ""));
 const passwordAutocomplete = computed(() => (mode.value === "register" ? "new-password" : "current-password"));
+const redirectPath = computed(() => {
+  const raw = String(route.query.redirect ?? "/");
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/";
+  return raw;
+});
 
 onMounted(async () => {
   await auth.restore();
   if (route.query.verifyToken) await confirmVerification(String(route.query.verifyToken));
   if (resetToken.value) showResetRequest.value = false;
-  if (auth.user) await router.replace("/");
+  if (auth.user) await router.replace(redirectPath.value);
 });
 
 useKuliSeo({
@@ -122,10 +127,28 @@ async function submit() {
         referralCode: referralCode.value || undefined
       });
     }
-    await router.push("/");
+    await navigateAfterAuth();
   } catch (caught) {
     error.value = caught instanceof ApiError ? caught.message : "提交失败，请稍后再试";
   }
+}
+
+async function navigateAfterAuth() {
+  await nextTick();
+  if (auth.user) {
+    await router.replace(redirectPath.value);
+    return;
+  }
+  const started = Date.now();
+  while (Date.now() - started < 3000) {
+    await auth.restore();
+    if (auth.user) {
+      await router.replace(redirectPath.value);
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  await router.replace(redirectPath.value);
 }
 
 async function confirmVerification(token: string) {
