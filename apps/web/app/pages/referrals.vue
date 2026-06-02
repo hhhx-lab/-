@@ -15,6 +15,7 @@
         <h2>{{ referral.referralCode }}</h2>
         <p>{{ inviteUrl }}</p>
         <button class="button" type="button" @click="copyInvite">复制邀请链接</button>
+        <p v-if="copyNotice" class="copy-toast" role="status" aria-live="polite">{{ copyNotice }}</p>
       </article>
       <article class="panel points-panel">
         <span class="plain-label">积分</span>
@@ -42,6 +43,8 @@ import type { UserReferral } from "~/composables/useApi";
 const auth = useAuthStore();
 const api = useApi();
 const referral = ref<UserReferral | null>(null);
+const copyNotice = ref("");
+let copyNoticeTimer: ReturnType<typeof setTimeout> | undefined;
 const inviteUrl = computed(() => {
   if (!referral.value) return "";
   if (import.meta.server) return referral.value.invitePath;
@@ -55,7 +58,32 @@ onMounted(async () => {
 
 async function copyInvite() {
   if (!inviteUrl.value) return;
-  await navigator.clipboard?.writeText(inviteUrl.value);
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(inviteUrl.value);
+    } else {
+      copyTextFallback(inviteUrl.value);
+    }
+    copyNotice.value = "已复制！快去分享给和你一样酷的朋友吧";
+    if (copyNoticeTimer) clearTimeout(copyNoticeTimer);
+    copyNoticeTimer = setTimeout(() => {
+      copyNotice.value = "";
+    }, 3200);
+  } catch {
+    copyNotice.value = "复制失败，请手动复制上方链接";
+  }
+}
+
+function copyTextFallback(value: string) {
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
 }
 
 function formatDate(value: string) {

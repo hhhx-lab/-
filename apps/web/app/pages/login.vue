@@ -7,16 +7,18 @@
       </div>
       <label v-if="mode === 'register'">展示名<input v-model="displayName" autocomplete="name" /></label>
       <label>邮箱<input v-model="email" autocomplete="email" /></label>
-      <label>
-        密码
+      <div class="field">
+        <label for="login-password">密码</label>
         <span class="password-field">
-          <input v-model="password" :type="showPassword ? 'text' : 'password'" :autocomplete="passwordAutocomplete" />
+          <input id="login-password" v-model="password" :type="passwordInputType" :autocomplete="passwordAutocomplete" />
           <button
             class="password-toggle"
             type="button"
+            aria-controls="login-password"
             :aria-label="showPassword ? '隐藏密码' : '显示密码'"
             :aria-pressed="showPassword"
-            @click="showPassword = !showPassword"
+            @click.stop.prevent="togglePasswordVisibility"
+            @pointerdown.prevent
           >
             <svg v-if="showPassword" aria-hidden="true" viewBox="0 0 24 24">
               <path d="M3 3l18 18" />
@@ -30,7 +32,7 @@
             </svg>
           </button>
         </span>
-      </label>
+      </div>
       <label v-if="mode === 'register'">邀请码<input v-model="referralCode" placeholder="可选" /></label>
       <button class="button" type="submit">{{ mode === "login" ? "登录" : "注册并进入" }}</button>
       <button v-if="mode === 'login'" class="link-button" type="button" @click="showResetRequest = !showResetRequest">忘记密码？</button>
@@ -44,16 +46,18 @@
       </div>
 
       <div v-if="resetToken" class="auth-assist">
-        <label>
-          新密码
+        <div class="field">
+          <label for="reset-password">新密码</label>
           <span class="password-field">
-            <input v-model="resetPassword" :type="showResetPassword ? 'text' : 'password'" autocomplete="new-password" placeholder="至少 8 位，包含字母和数字" />
+            <input id="reset-password" v-model="resetPassword" :type="resetPasswordInputType" autocomplete="new-password" placeholder="至少 8 位，包含字母和数字" />
             <button
               class="password-toggle"
               type="button"
+              aria-controls="reset-password"
               :aria-label="showResetPassword ? '隐藏新密码' : '显示新密码'"
               :aria-pressed="showResetPassword"
-              @click="showResetPassword = !showResetPassword"
+              @click.stop.prevent="toggleResetPasswordVisibility"
+              @pointerdown.prevent
             >
               <svg v-if="showResetPassword" aria-hidden="true" viewBox="0 0 24 24">
                 <path d="M3 3l18 18" />
@@ -67,7 +71,7 @@
               </svg>
             </button>
           </span>
-        </label>
+        </div>
         <button class="button secondary" type="button" @click="confirmReset">确认重置密码</button>
       </div>
     </form>
@@ -94,6 +98,8 @@ const showResetRequest = ref(false);
 const resetEmail = ref("");
 const resetPassword = ref("");
 const resetToken = ref(String(route.query.resetToken ?? ""));
+const passwordInputType = computed(() => (showPassword.value ? "text" : "password"));
+const resetPasswordInputType = computed(() => (showResetPassword.value ? "text" : "password"));
 const passwordAutocomplete = computed(() => (mode.value === "register" ? "new-password" : "current-password"));
 const redirectPath = computed(() => {
   const raw = String(route.query.redirect ?? "/");
@@ -131,6 +137,14 @@ async function submit() {
   } catch (caught) {
     error.value = caught instanceof ApiError ? caught.message : "提交失败，请稍后再试";
   }
+}
+
+function togglePasswordVisibility() {
+  showPassword.value = !showPassword.value;
+}
+
+function toggleResetPasswordVisibility() {
+  showResetPassword.value = !showResetPassword.value;
 }
 
 async function navigateAfterAuth() {
