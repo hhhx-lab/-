@@ -1,180 +1,179 @@
 <template>
-  <section class="shell page-hero services-hero">
-    <h1 class="mega">先拆问题，再决定怎么做</h1>
-    <p class="lead">
-      <span>遇到临时卡住的小事，可以先丢给酷里看看。</span>
-      <span>说不清也没关系，我们会把关键点一点点问出来</span>
-    </p>
-    <div class="hero-actions">
-      <NuxtLink class="button" to="/note">直接丢一张小纸条</NuxtLink>
-      <a class="button secondary" href="#services">看看服务范围</a>
-    </div>
-  </section>
+  <section class="shell proto-needs-page">
+    <header class="proto-needs-hero">
+      <div>
+        <h1>最近大家最常问的，都在这了</h1>
+        <p>如果你也在折腾 GPT、Google、Claude、API、中转配置这些，可以直接从这里进。</p>
+        <form class="proto-need-search" @submit.prevent="goSearch">
+          <span aria-hidden="true">⌕</span>
+          <input v-model="query" type="search" placeholder="你也可以直接说你想干嘛......">
+          <button type="submit" aria-label="提交需求搜索">→</button>
+        </form>
+      </div>
+      <article class="proto-sticky-note proto-note-lime proto-needs-note">
+        <span class="proto-tape" aria-hidden="true"></span>
+        <p>不确定自己属于哪一类？<br>直接说问题，我们来帮你分。 :)</p>
+      </article>
+    </header>
 
-  <section class="shell section" id="services">
-    <div class="section-head">
-      <h2>酷里可以帮你的事</h2>
-      <p>不用先分得很准，先把卡住的地方发来，酷里会帮你判断下一步。</p>
-    </div>
-    <div class="grid">
-      <NuxtLink v-for="(service, index) in services" :key="service.slug" class="card service-card" :class="{ featured: service.slug === 'not-sure' }" :to="`/services/${service.slug}`">
-        <div>
-          <div class="iconbox">{{ service.slug === "not-sure" ? "?" : String(index + 1).padStart(2, "0") }}</div>
-          <h3>{{ service.title }}</h3>
-          <p>{{ service.summary }}</p>
-        </div>
-        <ul class="inline-list">
-          <li v-for="need in service.commonNeeds.slice(0, 3)" :key="need" class="need-tag">{{ need }}</li>
-        </ul>
+    <div class="proto-featured-needs">
+      <NuxtLink v-for="need in filteredFeaturedNeeds" :key="need.title" class="proto-featured-card" :class="`tone-${need.tone}`" :to="noteLink(need.serviceSlug, need.title)">
+        <BrandIcon :name="need.brand" :fallback="need.icon" />
+        <h2>{{ need.title }}</h2>
+        <p>{{ need.description }}</p>
+        <strong>去咨询 →</strong>
       </NuxtLink>
     </div>
-  </section>
 
-  <section class="shell section" id="cases">
-    <div class="section-head">
-      <h2>几个常见小活</h2>
-      <p>这些是判断参考，不是固定商品。酷里会先看你的具体情况。</p>
-    </div>
-    <div class="grid">
-      <article v-for="item in caseCards" :key="item.title" class="card case-card" :class="{ featured: item.featured }">
-        <p class="plain-label">{{ item.tags.join(" / ") }}</p>
-        <div>
-          <h3>{{ item.title }}</h3>
-          <p>{{ item.description }}</p>
+    <div class="proto-need-board">
+      <article v-for="group in filteredNeedGroups" :key="group.title" class="proto-need-group" :class="`tone-${group.tone}`">
+        <header>
+          <span class="proto-group-number">{{ group.number }}</span>
+          <h2>{{ group.title }}</h2>
+          <NuxtLink :to="group.to">查看全部 →</NuxtLink>
+        </header>
+        <div class="proto-need-list">
+          <NuxtLink v-for="item in group.items" :key="item.title" class="proto-need-row" :to="noteLink(item.serviceSlug, item.title)">
+            <BrandIcon class="proto-mini-icon" :name="item.brand" :fallback="item.icon" />
+            <span>
+              <strong>{{ item.title }}</strong>
+              <small>{{ item.description }}</small>
+            </span>
+            <em>{{ item.actionLabel }}</em>
+          </NuxtLink>
         </div>
-        <footer>
-          <span>{{ item.fit }}</span>
-          <strong>{{ item.settlement }}</strong>
-        </footer>
       </article>
-      <article class="card case-card featured">
-        <div class="sticky-note"><strong>不用先写清楚方案</strong>直接截图，加一句“我现在卡在这里”，就可以作为第一张小纸条。</div>
-        <NuxtLink class="button" to="/note">丢张小纸条给酷里看看</NuxtLink>
+
+      <article class="proto-need-group proto-question-panel tone-orange">
+        <header>
+          <span class="proto-group-number">🔥</span>
+          <h2>大家也常问</h2>
+          <NuxtLink to="/help?doc=faq">更多问题 →</NuxtLink>
+        </header>
+        <NuxtLink v-for="item in commonQuestions" :key="item.title" class="proto-question-row" :to="item.to">
+          <span>
+            <strong>{{ item.title }}</strong>
+            <small>{{ item.description }}</small>
+          </span>
+          <b aria-hidden="true">›</b>
+        </NuxtLink>
       </article>
     </div>
-  </section>
 
-  <section class="shell section split-band" id="rules">
-    <article class="panel window quote-panel">
-      <p class="plain-label">交易规则</p>
-      <blockquote>
-        <span>小需求可以验收后付款；</span>
-        <span>复杂需求先收定金</span>
-      </blockquote>
-      <cite>默认不包长期售后，后续维护、部署、修改另算。</cite>
+    <article class="proto-bottom-cta">
+      <p><span aria-hidden="true">✧</span>没找到你需要的服务？告诉我们你的问题，定制专属解决方案</p>
+      <NuxtLink class="button proto-primary-action" to="/note?service=not-sure">我也有类似需求 →</NuxtLink>
     </article>
-    <div class="timeline">
-      <div class="timeline-item"><span class="step-num">1</span><div><strong>先判断</strong><p>你把材料发来，酷里先看能不能做、风险在哪里</p></div></div>
-      <div class="timeline-item"><span class="step-num">2</span><div><strong>再报价</strong><p>范围清楚后给大致价格；说不清的会继续追问</p></div></div>
-      <div class="timeline-item"><span class="step-num">3</span><div><strong>确认验收方式</strong><p>交付什么、怎么判断完成、是否需要部署，先讲明白</p></div></div>
-      <div class="timeline-item"><span class="step-num">4</span><div><strong>交付后结清</strong><p>小活可验收后付款；定金项目按约定节点结算</p></div></div>
-    </div>
-  </section>
-
-  <section class="shell section">
-    <table class="price-table" aria-label="结算方式说明">
-      <thead>
-        <tr><th>情况</th><th>怎么结算</th><th>适合例子</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>小需求</td><td>验收后付款</td><td>PDF 处理、配置指导、简单脚本、轻量页面修改</td></tr>
-        <tr><td>复杂需求</td><td>先付定金，节点验收</td><td>网页 demo、部署上线、远程排查、多轮修改</td></tr>
-        <tr><td>后续维护</td><td>作为新需求另算</td><td>功能新增、环境迁移、二次部署、长期托管</td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <section class="shell section" id="faq">
-    <div class="section-head">
-      <h2>常见问题</h2>
-      <p>点分类过滤，先把付款、范围、交付和风险看清楚。</p>
-    </div>
-    <div class="faq-tools" aria-label="FAQ 分类过滤">
-      <button v-for="item in faqFilters" :key="item.value" class="faq-filter" :class="{ 'is-active': faqFilter === item.value }" type="button" @click="faqFilter = item.value">
-        {{ item.label }}
-      </button>
-    </div>
-    <div class="faq">
-      <details v-for="item in visibleFaq" :key="item.question" :open="faqFilter !== 'all' || item.open">
-        <summary>{{ item.question }}</summary>
-        <p>{{ item.answer }}</p>
-      </details>
-    </div>
   </section>
 </template>
 
 <script setup lang="ts">
-const api = useApi();
-const { data } = await useAsyncData("services", () => api.listServices());
-const services = computed(() => data.value?.services ?? []);
+const router = useRouter();
+const query = ref("");
 
-const caseCards = [
+const featuredNeeds = [
+  { title: "注册 Google 账号", description: "注册 Google 邮箱，解决验证与风控问题", brand: "google", icon: "G", serviceSlug: "ai-tools", tone: "lime" },
+  { title: "Google Pro / Gemini", description: "开通 Google Pro、Gemini 会员订阅", brand: "gemini", icon: "✦", serviceSlug: "ai-tools", tone: "blue" },
+  { title: "GPT Pro / API", description: "ChatGPT Plus 升级、API 开通与使用", brand: "openai", icon: "AI", serviceSlug: "ai-tools", tone: "green" },
+  { title: "Claude / Claude Code", description: "Claude 订阅、Claude Code 授权", brand: "claude", icon: "CL", serviceSlug: "ai-tools", tone: "orange" },
+  { title: "API Key / 中转站 / token", description: "获取 API Key，中转配置与 token", brand: "openai", icon: "⚿", serviceSlug: "api-token", tone: "blue" },
+  { title: "工具安装 / 网络环境", description: "软件安装配置，网络与代理问题", brand: "", icon: "⚙", serviceSlug: "deployment-config", tone: "purple" }
+];
+
+const needGroups = [
   {
-    title: "帮学生把 GPT / Claude 使用路径理顺",
-    description: "确认地区、付款方式、账号风险和替代方案，给到可执行步骤；不承诺代替平台审核。",
-    tags: ["AI 工具", "账号开通"],
-    fit: "适合：不懂技术但想先用起来",
-    settlement: "先问",
-    featured: true
+    number: 1,
+    title: "GPT / OpenAI 相关",
+    tone: "lime",
+    to: "/services/ai-tools",
+    items: [
+      { title: "ChatGPT Plus 升级", description: "注册 GPT Plus 会员", brand: "openai", icon: "AI", serviceSlug: "ai-tools", actionLabel: "我要咨询" },
+      { title: "OpenAI API 开通", description: "开通 API，获取 Key", brand: "openai", icon: "⌘", serviceSlug: "api-token", actionLabel: "我要咨询" },
+      { title: "API 使用问题排查", description: "报错 / 配置 / 额度等问题", brand: "openai", icon: "⚿", serviceSlug: "api-token", actionLabel: "先聊聊" },
+      { title: "GPTs / 插件配置", description: "插件安装与使用指导", brand: "openai", icon: "◌", serviceSlug: "ai-tools", actionLabel: "先聊聊" }
+    ]
   },
   {
-    title: "论文 PDF 翻译后尽量保持原排版",
-    description: "先看页数、扫描质量和公式比例；能自动化就自动化，复杂页会提前说明可能变形。",
-    tags: ["PDF", "翻译排版"],
-    fit: "适合：急交材料",
-    settlement: "验收后付"
+    number: 2,
+    title: "Google / Gemini / 海外工具",
+    tone: "blue",
+    to: "/services/ai-tools",
+    items: [
+      { title: "注册 Google 账号", description: "解决注册与验证问题", brand: "google", icon: "G", serviceSlug: "ai-tools", actionLabel: "我要咨询" },
+      { title: "Google Pro 订阅", description: "开通 Google One / Pro", brand: "google", icon: "G+", serviceSlug: "ai-tools", actionLabel: "我要咨询" },
+      { title: "Gemini 订阅与使用", description: "Gemini Pro 开通与配置", brand: "gemini", icon: "✦", serviceSlug: "ai-tools", actionLabel: "先聊聊" },
+      { title: "YouTube Premium", description: "开通 YouTube Premium", brand: "youtube", icon: "▶", serviceSlug: "ai-tools", actionLabel: "先聊聊" }
+    ]
   },
   {
-    title: "把一句想法做成能看的网页原型",
-    description: "先做核心页面、按钮状态和提交反馈，不堆复杂后台；后续部署和维护另算。",
-    tags: ["网页 demo", "课程项目"],
-    fit: "适合：先给老师或队友看",
-    settlement: "可定金"
+    number: 3,
+    title: "Claude / Claude Code",
+    tone: "purple",
+    to: "/services/ai-tools",
+    items: [
+      { title: "Claude Pro 订阅", description: "订阅 Claude Pro 账号", brand: "claude", icon: "CL", serviceSlug: "ai-tools", actionLabel: "我要咨询" },
+      { title: "Claude Code 授权", description: "授权 Claude Code", brand: "claude", icon: "CC", serviceSlug: "ai-tools", actionLabel: "我要咨询" },
+      { title: "使用问题排查", description: "报错 / 限制 / 配置等", brand: "claude", icon: "◎", serviceSlug: "ai-tools", actionLabel: "先聊聊" },
+      { title: "多账号与团队方案", description: "团队 / 多账号配置支持", brand: "claude", icon: "∞", serviceSlug: "ai-tools", actionLabel: "先聊聊" }
+    ]
   },
   {
-    title: "服务器、域名、环境变量卡住",
-    description: "通过截图和远程信息判断问题；涉及账号权限、付费服务、敏感数据时会先讲风险。",
-    tags: ["部署", "远程配置"],
-    fit: "适合：临时上线前救急",
-    settlement: "先拆范围"
+    number: 4,
+    title: "API / 中转 / 模型配置",
+    tone: "blue",
+    to: "/services/api-token",
+    items: [
+      { title: "API Key 获取", description: "各大平台 API Key", brand: "openai", icon: "⚿", serviceSlug: "api-token", actionLabel: "我要咨询" },
+      { title: "中转站搭建", description: "搭建中转服务 / 代理", brand: "openai", icon: "▧", serviceSlug: "api-token", actionLabel: "我要咨询" },
+      { title: "Token 配置", description: "Token 获取与配置", brand: "openai", icon: "▣", serviceSlug: "api-token", actionLabel: "先聊聊" },
+      { title: "模型接入与调用", description: "接入第三方模型服务", brand: "gemini", icon: "◇", serviceSlug: "api-token", actionLabel: "先聊聊" }
+    ]
   },
   {
-    title: "批量改名、表格整理、图片压缩",
-    description: "把重复手工活变成一次性小脚本；交付时说明怎么跑、哪里不要乱改。",
-    tags: ["脚本", "批处理"],
-    fit: "适合：一次性效率需求",
-    settlement: "小活"
+    number: 5,
+    title: "网络环境 / 安装 / 远程协助",
+    tone: "green",
+    to: "/services/deployment-config",
+    items: [
+      { title: "代理 / 科学上网", description: "代理配置 / 节点推荐", brand: "", icon: "◎", serviceSlug: "deployment-config", actionLabel: "我要咨询" },
+      { title: "环境安装配置", description: "软件 / 环境安装配置", brand: "", icon: "▦", serviceSlug: "deployment-config", actionLabel: "我要咨询" },
+      { title: "远程协助", description: "一对一远程协助解决", brand: "", icon: "◉", serviceSlug: "deployment-config", actionLabel: "先聊聊" },
+      { title: "系统与软件问题", description: "系统 / 软件问题处理", brand: "", icon: "⌂", serviceSlug: "deployment-config", actionLabel: "先聊聊" }
+    ]
   }
 ];
 
-const faqFilters = [
-  { label: "全部", value: "all" },
-  { label: "付款", value: "payment" },
-  { label: "范围", value: "scope" },
-  { label: "交付", value: "delivery" },
-  { label: "风险", value: "risk" }
-] as const;
-
-const faqFilter = ref<(typeof faqFilters)[number]["value"]>("all");
-const faqItems = [
-  { topic: "scope", question: "我不会描述需求，可以直接发截图吗？", answer: "可以。直接截图，加一句“我现在卡在这里”；如果知道想达到什么效果，也可以顺手写上。酷里会根据截图继续追问。", open: true },
-  { topic: "payment", question: "小需求真的可以验收后付款吗？", answer: "范围清楚、工作量较小、风险可控时可以。复杂需求会先拆范围，必要时收定金。" },
-  { topic: "payment", question: "定金一般什么时候需要？", answer: "需要开发、部署、远程排查、多轮沟通、占用较长时间，或涉及第三方付费平台时，可能先收定金。" },
-  { topic: "delivery", question: "交付物会是什么？", answer: "取决于需求：可能是处理好的文件、配置步骤、可运行网页、脚本、部署结果或问题排查结论。" },
-  { topic: "scope", question: "能做完整 App 或长期项目吗？", answer: "酷里更适合短期轻量需求。完整 App 或长期项目可以先拆成 demo / 原型 / 技术验证，再决定是否继续。" },
-  { topic: "risk", question: "账号开通和订阅一定成功吗？", answer: "不保证。第三方平台规则、地区、支付和风控会变化，酷里只能先判断可行路径和风险。" },
-  { topic: "delivery", question: "默认包含后续维护吗？", answer: "不包含。交付后环境变化、功能新增、重新部署、二次修改，都作为新需求另算。" },
-  { topic: "risk", question: "哪些需求酷里不会接？", answer: "违法违规、绕过安全限制、盗号、破解、批量滥用平台、需要敏感账号密码且风险不可控的需求不会接。" }
+const commonQuestions = [
+  { title: "能不能远程？", description: "可以，大部分问题支持远程协助解决。", to: "/help?doc=faq" },
+  { title: "要不要先付款？", description: "先沟通需求和方案，确认后再付款。", to: "/help?doc=terms" },
+  { title: "会不会包售后？", description: "我们提供一定时间的售后支持，放心使用。", to: "/help?doc=terms" }
 ];
 
-const visibleFaq = computed(() => faqItems.filter((item) => faqFilter.value === "all" || item.topic === faqFilter.value));
+const normalizedQuery = computed(() => query.value.trim().toLowerCase());
+const filteredFeaturedNeeds = computed(() => {
+  if (!normalizedQuery.value) return featuredNeeds;
+  return featuredNeeds.filter((need) => `${need.title} ${need.description}`.toLowerCase().includes(normalizedQuery.value));
+});
+const filteredNeedGroups = computed(() => {
+  if (!normalizedQuery.value) return needGroups;
+  return needGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => `${item.title} ${item.description}`.toLowerCase().includes(normalizedQuery.value)) }))
+    .filter((group) => group.items.length);
+});
+
+function noteLink(serviceSlug: string, topic: string) {
+  return `/note?service=${encodeURIComponent(serviceSlug)}&topic=${encodeURIComponent(topic)}`;
+}
+
+async function goSearch() {
+  const topic = query.value.trim();
+  if (!topic) return;
+  await router.push(noteLink("not-sure", topic));
+}
 
 useKuliSeo({
-  title: "酷里服务详情 | AI 工具、文档处理、小工具开发和部署配置",
-  description: "查看酷里可承接的服务类型、常见需求、结算方式、交付边界和风险说明，适合先判断问题能不能做、材料够不够。",
-  path: "/services",
-  structuredData: computed(() => [
-    faqPageJsonLd(faqItems.slice(0, 5).map((item) => ({ question: item.question, answer: item.answer })))
-  ])
+  title: "热门需求 | 酷里 Kuly",
+  description: "查看酷里用户最常咨询的 GPT、Google、Claude、API、中转、安装和网络环境问题，快速发起咨询。",
+  path: "/services"
 });
 </script>

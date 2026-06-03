@@ -7,11 +7,12 @@
           <span class="brand-name"><strong>酷里 Kuly</strong><span>酷里小窗口</span></span>
         </NuxtLink>
         <nav class="navlinks" aria-label="主导航">
-          <NuxtLink to="/services">能做什么</NuxtLink>
-          <NuxtLink to="/note">写小纸条</NuxtLink>
+          <NuxtLink to="/services">热门需求</NuxtLink>
+          <NuxtLink to="/services/document-processing">文档处理</NuxtLink>
+          <NuxtLink to="/services/ai-tools">AI 工具</NuxtLink>
+          <NuxtLink to="/services/tool-development">小工具开发</NuxtLink>
+          <NuxtLink to="/services/deployment-config">部署配置</NuxtLink>
           <NuxtLink to="/orders">我的订单</NuxtLink>
-          <NuxtLink to="/products">产品</NuxtLink>
-          <NuxtLink to="/help">文档说明</NuxtLink>
           <NuxtLink v-if="auth.user?.role === 'admin'" to="/admin">管理后台</NuxtLink>
         </nav>
         <div class="nav-actions">
@@ -32,7 +33,7 @@
               <button class="button secondary" type="button" @click="logout">退出登录</button>
             </div>
           </details>
-          <NuxtLink class="button" to="/note">丢张小纸条给酷里看看</NuxtLink>
+          <NuxtLink class="button" to="/note"><span aria-hidden="true">✎</span>写张小纸条</NuxtLink>
         </div>
       </div>
     </header>
@@ -43,6 +44,7 @@
       <div class="shell">
         <span>酷里 Kuly</span>
         <nav aria-label="法律与服务说明">
+          <NuxtLink to="/services">热门需求</NuxtLink>
           <NuxtLink to="/help?doc=privacy">隐私政策</NuxtLink>
           <NuxtLink to="/help?doc=terms">服务条款</NuxtLink>
           <NuxtLink to="/help?doc=upload-policy">上传说明</NuxtLink>

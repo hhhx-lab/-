@@ -1,114 +1,119 @@
 <template>
-  <section class="shell hero">
-    <div>
-      <h1>有什么搞不定，先丢给<em>酷里</em>看看</h1>
-      <p class="lead">文件处理、AI 工具配置、小程序网页 demo、服务器部署卡住，都可以先从一张小纸条开始</p>
+  <section class="shell proto-home-hero">
+    <div class="proto-hero-copy">
+      <h1>搞不动？<br>先丢给<em>酷里</em>看看。</h1>
+      <p>我们是一个 AI 创客小队。文档、AI 工具、账号/订阅咨询、API 配置、小程序、网页、数据库、部署这些，都可以先聊聊。</p>
       <div class="hero-actions">
-        <NuxtLink class="button" to="/note">丢张小纸条给酷里看看</NuxtLink>
-        <NuxtLink class="button secondary" to="/services">看看能帮什么</NuxtLink>
+        <NuxtLink class="button proto-primary-action" to="/note"><span aria-hidden="true">✎</span>写张小纸条</NuxtLink>
+        <NuxtLink class="button secondary proto-secondary-action" to="/services"><span aria-hidden="true">☵</span>看看大家都在问什么</NuxtLink>
       </div>
     </div>
-    <div class="panel window hero-contact-window">
-      <div class="window-label hero-window-label"><span>需求沟通台</span></div>
-      <div class="chat-line me"><div class="bubble">我想开 GPT Pro，但不知道怎么弄。</div></div>
-      <div class="chat-line"><span class="avatar">K</span><div class="bubble">先把你在哪、用什么账号、方便怎么付说一下就好；小活确认能做，做好你看过再结。</div></div>
-      <div class="chat-line me"><div class="bubble">还有一个 PDF 想翻译，格式不要乱。</div></div>
-      <div class="chat-line"><span class="avatar">K</span><div class="bubble">把文件和目标语言一起丢过来，我们先判断工作量。</div></div>
-      <p class="sketch">直接截图：我现在卡在这里</p>
+
+    <div class="proto-hero-visual" aria-label="需求沟通示意">
+      <div class="proto-chat-window">
+        <div class="proto-window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p class="proto-chat-prompt"><span>$</span>你想搞定什么？</p>
+        <div class="proto-chat-bubble is-light">注册国外谷歌账号</div>
+        <div class="proto-chat-bubble is-right">购买谷歌 Pro</div>
+        <div class="proto-chat-bubble">购买 gptPro</div>
+        <div class="proto-typing" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
+      <article class="proto-sticky-note proto-note-blue">
+        <span class="proto-tape" aria-hidden="true"></span>
+        <p>先聊聊需求<br>能搞定再开工</p>
+        <small>- 酷里小队</small>
+      </article>
+      <article class="proto-sticky-note proto-note-lime">
+        <p>小需求当天搞定<br>大需求按里程碑来</p>
+        <small>- Kuli :)</small>
+      </article>
+      <span class="proto-star proto-star-one" aria-hidden="true">✧</span>
+      <span class="proto-squiggle" aria-hidden="true">↝</span>
     </div>
   </section>
 
-  <section class="shell section">
-    <div class="section-head">
-      <h2>最近大家都在问</h2>
-      <p>不是标准商品列表，更像一扇小窗口：先说问题，酷里判断能不能做、怎么做。</p>
+  <section class="shell proto-section">
+    <div class="proto-section-title">
+      <span aria-hidden="true">🔥</span>
+      <h2>最近大家问得最多</h2>
     </div>
-    <div class="grid">
-      <article class="card service-card featured">
-        <div><div class="iconbox">AI</div><h3>GPT / Claude / Google 相关</h3><p>账号注册、订阅开通、API Key、Claude Code 授权、Gemini 使用问题。</p></div>
-        <NuxtLink class="chip" to="/note?service=ai-tools">我想先问问 →</NuxtLink>
-      </article>
-      <article class="card service-card">
-        <div><div class="iconbox">PDF</div><h3>文档与文件急救</h3><p>PDF 翻译保格式、表格整理、批量改名、压缩包与报错文件排查。</p></div>
-        <NuxtLink class="chip" to="/services/document-processing">查看说明 →</NuxtLink>
-      </article>
-      <article class="card service-card">
-        <div><div class="iconbox">&lt;/&gt;</div><h3>小工具与网页 demo</h3><p>小程序、网页、课程项目 demo、自动化脚本，先做能看的试跑版本。</p></div>
-        <NuxtLink class="chip" to="/note?service=tool-development">说说想法 →</NuxtLink>
-      </article>
-      <article class="card service-card">
-        <div><div class="iconbox">SSH</div><h3>部署与远程配置</h3><p>服务器部署、域名、数据库、代理网络、远程协助排查。</p></div>
-        <NuxtLink class="chip" to="/services/deployment-config">看规则 →</NuxtLink>
-      </article>
-      <article class="card service-card">
-        <div><div class="iconbox">?</div><h3>不知道归哪类</h3><p>描述不清也没关系，直接截图，加一句“我现在卡在这里”，酷里会继续追问。</p></div>
-        <NuxtLink class="chip" to="/note?service=not-sure">直接写纸条 →</NuxtLink>
-      </article>
-      <article class="card service-card">
-        <div class="sticky-note"><strong>小活当天搞定</strong>大一点的需求先拆范围，再决定是否收定金。</div>
-      </article>
+    <div class="proto-need-strip">
+      <NuxtLink v-for="need in hotNeeds" :key="need.title" class="proto-need-card" :class="`tone-${need.tone}`" :to="need.to">
+        <BrandIcon :name="need.brand" :fallback="need.icon" />
+        <h3>{{ need.title }}</h3>
+        <p>{{ need.description }}</p>
+        <strong>去看看 →</strong>
+      </NuxtLink>
     </div>
   </section>
 
-  <section class="shell section">
-    <div class="section-head">
-      <h2>酷里怎么做</h2>
-      <p>流程尽量轻，不把一次临时求助变成复杂项目。</p>
+  <section class="shell proto-section">
+    <div class="proto-section-title">
+      <span aria-hidden="true">🛠</span>
+      <h2>酷里大概能搞</h2>
     </div>
-    <div class="grid">
-      <article class="card process-card"><span class="step-num">1</span><h3>你先说需求</h3><p>写几句话、发截图或文件，告诉我们你想解决什么。</p></article>
-      <article class="card process-card"><span class="step-num">2</span><h3>酷里判断能不能做</h3><p>评估可行性、工作量、风险和大致报价。</p></article>
-      <article class="card process-card"><span class="step-num">3</span><h3>小需求验收后付款</h3><p>能快速交付的任务，确认效果后再付款。</p></article>
-      <article class="card process-card"><span class="step-num">4</span><h3>复杂需求先定金</h3><p>需要开发、部署或多轮沟通时，可能先收一部分定金。</p></article>
+    <div class="proto-capability-grid">
+      <NuxtLink v-for="item in capabilities" :key="item.title" class="proto-capability-card" :to="item.to">
+        <BrandIcon :name="item.brand" :fallback="item.icon" :tile-class="`tone-${item.tone}`" />
+        <div>
+          <h3>{{ item.title }}</h3>
+          <p>{{ item.description }}</p>
+          <strong>去看看 →</strong>
+        </div>
+      </NuxtLink>
     </div>
-    <article class="notice">
-      <strong>提醒</strong>
-      <span>默认不包长期售后。后续部署、维护、修改、二次开发会另算。</span>
+  </section>
+
+  <section class="shell proto-section">
+    <div class="proto-section-title">
+      <span aria-hidden="true">✧</span>
+      <h2>我们怎么做</h2>
+    </div>
+    <div class="proto-process-rail">
+      <article v-for="step in processSteps" :key="step.title" class="proto-process-card" :class="`tone-${step.tone}`">
+        <span class="proto-step-badge">{{ step.number }}</span>
+        <span class="proto-process-icon">{{ step.icon }}</span>
+        <div>
+          <h3>{{ step.title }}</h3>
+          <p>{{ step.description }}</p>
+        </div>
+      </article>
+    </div>
+    <article class="proto-notice-bar">
+      <span aria-hidden="true">♢</span>
+      <p>小活可以先做完再结；大一点的活可能要先付点定金。默认不包长期售后，部署 / 维护 / 修改另算。</p>
     </article>
-  </section>
-
-  <section class="shell section home-contact-section">
-    <div class="section-head">
-      <h2>联系我们</h2>
-      <p>订单沟通默认在站内完成；也可以通过这些渠道找到酷里。</p>
-    </div>
-    <div class="home-contact-grid">
-      <article class="contact-channel-card">
-        <div>
-          <span>QQ 群</span>
-          <strong>加入群聊</strong>
-        </div>
-        <img src="/contact/qq-group.png" alt="酷里 QQ 群二维码" />
-      </article>
-      <article class="contact-channel-card">
-        <div>
-          <span>企业微信</span>
-          <strong>联系小助手</strong>
-        </div>
-        <img src="/contact/wecom-contact.png" alt="酷里企业微信二维码" />
-      </article>
-      <article class="contact-channel-card">
-        <div>
-          <span>微信公众号</span>
-          <strong>关注酷里</strong>
-        </div>
-        <img src="/contact/wechat-official.jpg" alt="酷里微信公众号二维码" />
-      </article>
-      <article class="contact-channel-card">
-        <div>
-          <span>小红书</span>
-          <strong>看看动态</strong>
-        </div>
-        <img src="/contact/xiaohongshu.png" alt="酷里小红书二维码" />
-      </article>
-    </div>
   </section>
 </template>
 
 <script setup lang="ts">
+const hotNeeds = [
+  { title: "GPT / Pro / API", description: "GPT Pro 订阅、API 开通与使用问题", brand: "openai", icon: "AI", tone: "green", to: "/services/ai-tools" },
+  { title: "Google / Gemini", description: "注册谷歌账号、Gemini、Google One 等订阅", brand: "google", icon: "G", tone: "blue", to: "/note?service=ai-tools&topic=Google%20%2F%20Gemini" },
+  { title: "Claude / Claude Code", description: "Claude 订阅、Claude Code 授权与使用", brand: "claude", icon: "CL", tone: "orange", to: "/note?service=ai-tools&topic=Claude%20Code" },
+  { title: "API Key / 中转站", description: "OpenAI / Claude / 各类 API Key 与中转服务", brand: "openai", icon: "⚿", tone: "blue", to: "/note?service=api-token" },
+  { title: "工具安装 / 网络环境", description: "软件安装、环境配置、网络与代理问题", icon: "⚙", tone: "purple", to: "/note?service=deployment-config" },
+  { title: "不知道选啥，直接问", description: "不确定从哪里开始？先说说你的情况", icon: "…", tone: "lime", to: "/note?service=not-sure" }
+];
+
+const capabilities = [
+  { title: "文档急救", description: "论文/报告/方案/简历等修改、润色、排版，AI 翻译写作与内容整理。", icon: "▤", tone: "lime", to: "/services/document-processing" },
+  { title: "AI 工具配置", description: "各类 AI 工具订阅、账号注册、API 配置与使用问题，一站式搞定。", brand: "openai", icon: "⬡", tone: "blue", to: "/services/ai-tools" },
+  { title: "小工具开发", description: "脚本、自动化、小程序、网页等小需求的工具便利开发。", icon: "</>", tone: "purple", to: "/services/tool-development" },
+  { title: "部署上线", description: "网站/小程序/项目部署、数据库、域名、服务器等环境配置。", icon: "▦", tone: "green", to: "/services/deployment-config" }
+];
+
+const processSteps = [
+  { number: 1, title: "你先说需求", description: "写张小纸条，告诉我们你想要做什么。", icon: "☷", tone: "lime" },
+  { number: 2, title: "我们判断能不能做", description: "评估可行性，给出思路、方案和大致报价。", icon: "☑", tone: "blue" },
+  { number: 3, title: "先跑一个初版", description: "先交付一个可用版本，你先看看效果。", icon: ">_", tone: "purple" },
+  { number: 4, title: "满意后继续", description: "有问题继续调整优化，直到你满意。", icon: "↻", tone: "neutral" },
+  { number: 5, title: "验收后付款", description: "确认 ok 后再付款，简单透明。", icon: "✓", tone: "green" }
+];
+
 useKuliSeo({
-  title: "酷里 Kuly | AI 工具、文档处理和小工具开发服务",
-  description: "酷里帮助用户从一张小纸条开始咨询 AI 工具、文档处理、小工具开发、部署配置和 API/token 相关需求，先判断边界，再推进订单交付。",
+  title: "酷里 Kuly | 先聊需求，再判断能不能搞定",
+  description: "酷里是一个 AI 创客小窗口，支持 AI 工具、账号订阅、API 配置、文档处理、小工具开发和部署配置需求咨询。",
   path: "/"
 });
 </script>

@@ -19,54 +19,80 @@
     </button>
 
     <section v-if="open" class="xiaoku-panel">
-      <div class="section-head compact">
-        <strong>小酷</strong>
-        <div class="xiaoku-controls">
-          <button type="button" title="别跟着我" @click="toggleFollow">{{ followMouse ? "定" : "跟" }}</button>
-          <button type="button" title="减少动画" @click="toggleReduced">{{ reduced ? "动" : "静" }}</button>
-          <button type="button" title="静音" @click="toggleMuted">{{ muted ? "声" : "默" }}</button>
-          <button type="button" title="隐藏本页" @click="hideForPage">×</button>
+      <XProvider>
+        <div class="section-head compact">
+          <div class="xiaoku-title">
+            <span class="xiaoku-title-mark" aria-hidden="true">K</span>
+            <div>
+              <strong>小酷助手</strong>
+              <small>在线陪你整理需求</small>
+            </div>
+          </div>
+          <div class="xiaoku-controls">
+            <button type="button" title="别跟着我" @click="toggleFollow">{{ followMouse ? "定" : "跟" }}</button>
+            <button type="button" title="减少动画" @click="toggleReduced">{{ reduced ? "动" : "静" }}</button>
+            <button type="button" title="静音" @click="toggleMuted">{{ muted ? "声" : "默" }}</button>
+            <button type="button" title="隐藏本页" @click="hideForPage">×</button>
+          </div>
         </div>
-      </div>
-      <div ref="messagesRef" class="xiaoku-messages" aria-live="polite">
-        <article v-for="item in messages" :key="item.id" class="xiaoku-message" :class="item.role">
-          <span>{{ item.role === "assistant" ? "小酷" : "你" }}</span>
-          <p>{{ item.content }}</p>
-        </article>
-        <article v-if="pending" class="xiaoku-message assistant pending">
-          <span>小酷</span>
-          <p>我先帮你整理一下</p>
-        </article>
-      </div>
-      <div v-if="draft" class="xiaoku-draft">
-        <strong>小纸条草稿</strong>
-        <span>{{ draft.summary }}</span>
-        <small v-if="draft.missingFields.length">还可以补：{{ draft.missingFields.join("、") }}</small>
-      </div>
-      <div v-if="citations.length" class="xiaoku-citations" aria-label="小酷引用">
-        <span>参考</span>
-        <NuxtLink v-for="citation in citations" :key="citation.to" :to="citation.to">{{ citation.title }}</NuxtLink>
-      </div>
-      <div v-if="panelActions.length" class="xiaoku-actions">
-        <NuxtLink v-for="action in panelActions" :key="action.to + action.label" :to="action.to">{{ action.label }}</NuxtLink>
-      </div>
-      <form class="chat-row" @submit.prevent="send">
-        <input v-model="message" :disabled="pending" placeholder="问问服务、材料或订单状态" @focus="setState('calm')" />
-        <button type="submit" :disabled="pending || !message.trim()">问</button>
-      </form>
+        <div class="xiaoku-x-intro">
+          <Welcome
+            variant="borderless"
+            root-class-name="xiaoku-x-welcome"
+            :icon="welcomeIcon"
+            title="我是小酷"
+            :description="welcomeDescription"
+          />
+        </div>
+        <div ref="messagesRef" class="xiaoku-messages xiaoku-x-bubbles" aria-live="polite">
+          <BubbleList :items="bubbleItems" :roles="bubbleRoles" :auto-scroll="true" />
+        </div>
+        <div v-if="draft" class="xiaoku-draft">
+          <strong>小纸条草稿</strong>
+          <span>{{ draft.summary }}</span>
+          <small v-if="draft.missingFields.length">还可以补：{{ draft.missingFields.join("、") }}</small>
+        </div>
+        <div v-if="citations.length" class="xiaoku-citations" aria-label="小酷引用">
+          <span>参考</span>
+          <NuxtLink v-for="citation in citations" :key="citation.to" :to="citation.to">{{ citation.title }}</NuxtLink>
+        </div>
+        <div class="xiaoku-x-prompts">
+          <Prompts title="小酷可以帮你" :items="promptItems" :wrap="true" @item-click="handlePromptClick" />
+        </div>
+        <Sender
+          :value="message"
+          :loading="assistantBusy"
+          :disabled="!sessionId"
+          :send-disabled="assistantBusy || !message.trim()"
+          placeholder="问问服务、材料或订单状态"
+          root-class-name="xiaoku-x-sender"
+          :auto-size="{ minRows: 1, maxRows: 3 }"
+          @change="handleSenderChange"
+          @submit="send"
+          @focus="setState('calm')"
+        />
+      </XProvider>
     </section>
   </aside>
 </template>
 
 <script setup lang="ts">
+import { h } from "vue";
+import { BubbleList, Prompts, Sender, Welcome, XProvider, useXAgent, useXChat } from "ant-design-x-vue";
+import type { BubbleListProps } from "ant-design-x-vue";
 import type * as Three from "three";
 
 type XiaokuState = "idle" | "curious" | "thinking" | "happy" | "alert" | "sleep" | "hide" | "calm";
-type ChatMessage = { id: string; role: "assistant" | "user"; content: string };
+type XiaokuChatMessage = { role: "assistant" | "user"; content: string };
+type XiaokuPrompt = { key: string; label: string; description?: string; to?: string; message?: string };
+type XiaokuAgentRequest = { message?: XiaokuChatMessage; messages?: XiaokuChatMessage[] };
+type XiaokuBubbleItem = NonNullable<BubbleListProps["items"]>[number];
+type XiaokuBubbleRoles = NonNullable<BubbleListProps["roles"]>;
 
 const api = useApi();
 const auth = useAuthStore();
 const route = useRoute();
+const router = useRouter();
 const open = ref(false);
 const sleep = ref(false);
 const visible = ref(true);
@@ -86,7 +112,6 @@ const motionState = ref<XiaokuState>("idle");
 const bubble = ref("");
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 const messagesRef = ref<HTMLElement | null>(null);
-const messages = ref<ChatMessage[]>([]);
 const pointer = reactive({ x: 0, y: 0 });
 const offset = reactive({ x: 0, y: 0 });
 const quickActions = computed(() => pageContext(route.path).actions);
@@ -99,7 +124,90 @@ const panelActions = computed(() => {
     return true;
   });
 });
+const welcomeIcon = h("span", { class: "xiaoku-welcome-mark", "aria-hidden": "true" }, "K");
+const welcomeDescription = computed(() => pageContext(route.path).text);
+const promptItems = computed<XiaokuPrompt[]>(() => {
+  const routePrompts = panelActions.value.map((action) => ({
+    key: `action:${action.to}:${action.label}`,
+    label: action.label,
+    description: action.to.startsWith("/note") ? "我帮你把需求整理成小纸条" : "带你去对应页面继续处理",
+    to: action.to
+  }));
+  return [
+    { key: "ask:service", label: "帮我选服务", description: "描述目标，我判断适合哪类服务", message: "我想做一个需求，但不知道该选哪类服务，你帮我判断一下。" },
+    { key: "ask:material", label: "检查材料", description: "看看小纸条还缺哪些信息", message: "请帮我检查一下现在还缺哪些材料或需求信息。" },
+    ...routePrompts
+  ];
+});
+const xAgent = useXAgent<XiaokuChatMessage, XiaokuAgentRequest, XiaokuChatMessage>({
+  request: async (info, callbacks) => {
+    const content = info.message?.content?.trim();
+    if (!content || !sessionId.value) {
+      callbacks.onError(new Error("小酷会话还没有准备好"));
+      return;
+    }
+    pending.value = true;
+    setState("thinking");
+    try {
+      const response = await api.chat({ sessionId: sessionId.value, message: content }, auth.token);
+      actions.value = response.actions;
+      citations.value = response.citations ?? [];
+      draft.value = response.draft ?? null;
+      callbacks.onSuccess([{ role: "assistant", content: response.answer }]);
+      setState("happy", 2600);
+    } catch (error) {
+      callbacks.onError(error instanceof Error ? error : new Error("小酷请求失败"));
+      setState("alert", 2600);
+    } finally {
+      pending.value = false;
+      void scrollMessages();
+    }
+  }
+})[0]!;
+const { onRequest, parsedMessages, setMessages: setXMessages } = useXChat<XiaokuChatMessage, XiaokuChatMessage, XiaokuAgentRequest, XiaokuChatMessage>({
+  agent: xAgent.value,
+  requestPlaceholder: { role: "assistant", content: "我先帮你整理一下" },
+  requestFallback: { role: "assistant", content: "我这边刚才没连上，可以稍后再问一次，或者先写小纸条给管理员。" }
+});
+const assistantBusy = computed(() => pending.value || xAgent.value.isRequesting());
+const bubbleItems = computed<XiaokuBubbleItem[]>(() =>
+  parsedMessages.value.map((item) => ({
+    key: item.id,
+    role: item.message.role,
+    content: item.message.content,
+    placement: item.message.role === "user" ? "end" as const : "start" as const,
+    loading: item.status === "loading",
+    typing: item.status === "success" && item.message.role === "assistant" ? { step: 2, interval: 18 } : false
+  }))
+);
+const bubbleRoles: XiaokuBubbleRoles = {
+  assistant: {
+    avatar: () => h("span", { class: "xiaoku-role-avatar assistant", "aria-hidden": "true" }, "K"),
+    variant: "filled",
+    shape: "corner",
+    header: "小酷"
+  },
+  user: {
+    avatar: () => h("span", { class: "xiaoku-role-avatar user", "aria-hidden": "true" }, "你"),
+    variant: "filled",
+    shape: "corner",
+    header: "你"
+  }
+};
 const stateLabel = computed(() => ({ idle: "online", curious: "scan", thinking: "think", happy: "done", alert: "check", sleep: "sleep", hide: "mini", calm: "calm" })[motionState.value]);
+
+function createClientId() {
+  const cryptoApi = globalThis.crypto;
+  if (typeof cryptoApi?.randomUUID === "function") return cryptoApi.randomUUID();
+  if (typeof cryptoApi?.getRandomValues === "function") {
+    const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+    bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40;
+    bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"));
+    return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+  }
+  return `xiaoku-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
 
 let frame = 0;
 let ThreeRuntime: typeof import("three") | null = null;
@@ -122,7 +230,7 @@ onMounted(async () => {
   followMouse.value = localStorage.getItem("kuli-xiaoku-follow") !== "false";
   let storedVisitorId = localStorage.getItem("kuli-visitor");
   if (!storedVisitorId) {
-    storedVisitorId = crypto.randomUUID();
+    storedVisitorId = createClientId();
     localStorage.setItem("kuli-visitor", storedVisitorId);
   }
   visitorId.value = storedVisitorId;
@@ -370,7 +478,7 @@ function showPageHint() {
 
 function seedGreeting() {
   const context = pageContext(route.path);
-  messages.value = [{ id: crypto.randomUUID(), role: "assistant", content: context.text }];
+  setXMessages([{ id: createClientId(), status: "local", message: { role: "assistant", content: context.text } }]);
   actions.value = [...context.actions];
   citations.value = [];
   draft.value = null;
@@ -453,26 +561,23 @@ function hideForPage() {
 
 async function send() {
   const content = message.value.trim();
-  if (!content || !sessionId.value || pending.value) return;
-  messages.value.push({ id: crypto.randomUUID(), role: "user", content });
+  if (!content || !sessionId.value || assistantBusy.value) return;
   message.value = "";
-  pending.value = true;
-  setState("thinking");
+  onRequest({ message: { role: "user", content } });
   await scrollMessages();
-  try {
-    const response = await api.chat({ sessionId: sessionId.value, message: content }, auth.token);
-    messages.value.push({ id: crypto.randomUUID(), role: "assistant", content: response.answer });
-    actions.value = response.actions;
-    citations.value = response.citations ?? [];
-    draft.value = response.draft ?? null;
-    setState("happy", 2600);
-  } catch {
-    messages.value.push({ id: crypto.randomUUID(), role: "assistant", content: "我这边刚才没连上，可以稍后再问一次，或者先写小纸条给管理员。" });
-    setState("alert", 2600);
-  } finally {
-    pending.value = false;
-    await scrollMessages();
+}
+
+function handleSenderChange(value: string) {
+  message.value = value;
+}
+
+function handlePromptClick({ data }: { data: { key: string; message?: string; to?: string } }) {
+  if (data.message) {
+    message.value = data.message;
+    void send();
+    return;
   }
+  if (data.to) void router.push(data.to);
 }
 
 async function scrollMessages() {

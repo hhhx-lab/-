@@ -2,7 +2,7 @@ export default defineNuxtConfig({
   compatibilityDate: "2026-05-29",
   srcDir: "app/",
   modules: ["@pinia/nuxt"],
-  css: ["~/assets/css/main.css"],
+  css: ["ant-design-vue/dist/reset.css", "~/assets/css/main.css"],
   runtimeConfig: {
     public: {
       apiBaseUrl: process.env.NUXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000",
@@ -18,8 +18,11 @@ export default defineNuxtConfig({
     typeCheck: true
   },
   vite: {
+    ssr: {
+      noExternal: ["ant-design-vue", "ant-design-x-vue"]
+    },
     optimizeDeps: {
-      include: ["@vue/devtools-core", "@vue/devtools-kit", "three"]
+      include: ["@vue/devtools-core", "@vue/devtools-kit", "ant-design-vue", "ant-design-x-vue", "three"]
     }
   }
 });
