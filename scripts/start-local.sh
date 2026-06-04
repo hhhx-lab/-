@@ -12,6 +12,8 @@ WEB_HOST="${WEB_HOST:-0.0.0.0}"
 WEB_PORT="${WEB_PORT:-3000}"
 API_BASE_URL="${NUXT_PUBLIC_API_BASE_URL:-http://127.0.0.1:${API_PORT}}"
 SITE_URL="${NUXT_PUBLIC_SITE_URL:-http://127.0.0.1:${WEB_PORT}}"
+APP_ENV="${APP_ENV:-local}"
+CORS_ORIGINS="${CORS_ORIGINS:-http://localhost:${WEB_PORT},http://127.0.0.1:${WEB_PORT},http://localhost:5173,http://127.0.0.1:5173}"
 
 API_SESSION="${KULI_API_SESSION:-kuli-api}"
 WEB_SESSION="${KULI_WEB_SESSION:-kuli-web}"
@@ -111,22 +113,22 @@ log "确保本地数据库存在：${LOCAL_DB_NAME}"
 docker exec "${COMPOSE_PROJECT_NAME}-postgres-1" createdb -U kuli "$LOCAL_DB_NAME" >/dev/null 2>&1 || true
 
 log "运行 Alembic migration"
-DATABASE_URL="$DATABASE_URL" REDIS_URL="$REDIS_URL" npm run db:migrate
+APP_ENV="$APP_ENV" CORS_ORIGINS="$CORS_ORIGINS" DATABASE_URL="$DATABASE_URL" REDIS_URL="$REDIS_URL" npm run db:migrate
 
 log "索引文档中心知识库"
-DATABASE_URL="$DATABASE_URL" REDIS_URL="$REDIS_URL" PYTHONPATH=apps/api uv run --project apps/api python scripts/index_knowledge.py
+APP_ENV="$APP_ENV" CORS_ORIGINS="$CORS_ORIGINS" DATABASE_URL="$DATABASE_URL" REDIS_URL="$REDIS_URL" PYTHONPATH=apps/api uv run --project apps/api python scripts/index_knowledge.py
 
 log "检查知识库健康"
-DATABASE_URL="$DATABASE_URL" REDIS_URL="$REDIS_URL" PYTHONPATH=apps/api uv run --project apps/api python scripts/knowledge_doctor.py
+APP_ENV="$APP_ENV" CORS_ORIGINS="$CORS_ORIGINS" DATABASE_URL="$DATABASE_URL" REDIS_URL="$REDIS_URL" PYTHONPATH=apps/api uv run --project apps/api python scripts/knowledge_doctor.py
 
 log "构建 Nuxt 前端"
 NUXT_PUBLIC_API_BASE_URL="$API_BASE_URL" NUXT_PUBLIC_SITE_URL="$SITE_URL" npm run build
 
 start_tmux_session "$API_SESSION" "$ROOT_DIR" \
-  "DATABASE_URL='$DATABASE_URL' REDIS_URL='$REDIS_URL' PYTHONPATH=apps/api uv run --project apps/api uvicorn app.main:app --host '$API_HOST' --port '$API_PORT'"
+  "APP_ENV='$APP_ENV' CORS_ORIGINS='$CORS_ORIGINS' DATABASE_URL='$DATABASE_URL' REDIS_URL='$REDIS_URL' PYTHONPATH=apps/api uv run --project apps/api uvicorn app.main:app --host '$API_HOST' --port '$API_PORT'"
 
 start_tmux_session "$WORKER_SESSION" "$ROOT_DIR" \
-  "DATABASE_URL='$DATABASE_URL' REDIS_URL='$REDIS_URL' PYTHONPATH=apps/api uv run --project apps/api celery -A app.tasks.celery_app.celery_app worker --loglevel=INFO"
+  "APP_ENV='$APP_ENV' CORS_ORIGINS='$CORS_ORIGINS' DATABASE_URL='$DATABASE_URL' REDIS_URL='$REDIS_URL' PYTHONPATH=apps/api uv run --project apps/api celery -A app.tasks.celery_app.celery_app worker --loglevel=INFO"
 
 start_tmux_session "$WEB_SESSION" "$ROOT_DIR/apps/web" \
   "HOST='$WEB_HOST' PORT='$WEB_PORT' NITRO_HOST='$WEB_HOST' NITRO_PORT='$WEB_PORT' NUXT_PUBLIC_API_BASE_URL='$API_BASE_URL' NUXT_PUBLIC_SITE_URL='$SITE_URL' node .output/server/index.mjs"

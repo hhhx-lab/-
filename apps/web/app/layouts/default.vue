@@ -8,12 +8,14 @@
         </NuxtLink>
         <nav class="navlinks" aria-label="主导航">
           <NuxtLink to="/services">热门需求</NuxtLink>
+          <NuxtLink to="/products">子项目</NuxtLink>
           <NuxtLink to="/services/document-processing">文档处理</NuxtLink>
           <NuxtLink to="/services/ai-tools">AI 工具</NuxtLink>
           <NuxtLink to="/services/tool-development">小工具开发</NuxtLink>
           <NuxtLink to="/services/deployment-config">部署配置</NuxtLink>
           <NuxtLink to="/orders">我的订单</NuxtLink>
           <NuxtLink v-if="auth.user?.role === 'admin'" to="/admin">管理后台</NuxtLink>
+          <NuxtLink to="/help">文档中心</NuxtLink>
         </nav>
         <div class="nav-actions">
           <NuxtLink v-if="!auth.user" class="button secondary" to="/login">登录 / 注册</NuxtLink>
@@ -44,7 +46,6 @@
       <div class="shell">
         <span>酷里 Kuly</span>
         <nav aria-label="法律与服务说明">
-          <NuxtLink to="/services">热门需求</NuxtLink>
           <NuxtLink to="/help?doc=privacy">隐私政策</NuxtLink>
           <NuxtLink to="/help?doc=terms">服务条款</NuxtLink>
           <NuxtLink to="/help?doc=upload-policy">上传说明</NuxtLink>
