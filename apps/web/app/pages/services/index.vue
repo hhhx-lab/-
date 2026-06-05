@@ -172,7 +172,7 @@ async function goSearch() {
 }
 
 useKuliSeo({
-  title: "热门需求 | 酷里 Kuly",
+  title: "服务总览 | 酷里 Kuly",
   description: "查看酷里用户最常咨询的 GPT、Google、Claude、API、中转、安装和网络环境问题，快速发起咨询。",
   path: "/services"
 });

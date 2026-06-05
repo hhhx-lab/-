@@ -7,7 +7,7 @@
           <span class="brand-name"><strong>酷里 Kuly</strong><span>酷里小窗口</span></span>
         </NuxtLink>
         <nav class="navlinks" aria-label="主导航">
-          <NuxtLink to="/services">热门需求</NuxtLink>
+          <NuxtLink to="/services">服务总览</NuxtLink>
           <NuxtLink to="/products">子项目</NuxtLink>
           <NuxtLink to="/services/document-processing">文档处理</NuxtLink>
           <NuxtLink to="/services/ai-tools">AI 工具</NuxtLink>

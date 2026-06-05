@@ -1,6 +1,21 @@
 from functools import lru_cache
+from os import getenv
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+def _env_files() -> tuple[str, ...]:
+    explicit = getenv("KULI_SETTINGS_ENV_FILE")
+    if explicit:
+        return tuple(item for item in (part.strip() for part in explicit.split(",")) if item)
+    return (
+        str(REPO_ROOT / ".env"),
+        str(REPO_ROOT / "apps/api/.env"),
+    )
 
 
 class Settings(BaseSettings):
@@ -45,7 +60,7 @@ class Settings(BaseSettings):
     notification_max_retries: int = 3
     max_request_body_bytes: int = 2 * 1024 * 1024
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_env_files(), env_file_encoding="utf-8", extra="ignore")
 
     @property
     def cors_origin_list(self) -> list[str]:

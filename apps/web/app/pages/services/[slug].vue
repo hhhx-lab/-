@@ -35,19 +35,6 @@
       </aside>
     </section>
 
-    <section v-if="page.layout === 'dashboard'" class="section service-terminal panel window">
-      <div class="window-label">
-        <strong>kuly@ai-cluster:~#</strong>
-        <span>Terminal Dashboard</span>
-      </div>
-      <div class="service-terminal-lines">
-        <p><span>kuly@ai-cluster:~#</span> inspect --service=ai_ecosystem</p>
-        <p>[OK] Deep validation for {{ page.capabilities.length }} dynamic cloud instances finished.</p>
-        <p><span>kuly@ai-cluster:~#</span> show --capabilities</p>
-        <p>[MATRIX] {{ page.capabilities.length }} core elements configured natively. Telemetry status: ONLINE</p>
-      </div>
-    </section>
-
     <section class="section service-section">
       <p class="section-kicker">{{ sectionLabels.capabilities }}</p>
       <div class="section-head">
@@ -57,20 +44,25 @@
 
       <div class="service-detail-card-grid">
         <article
-          v-for="item in page.capabilities"
+          v-for="(item, index) in page.capabilities"
           :key="item.title"
           class="service-detail-card"
           :class="item.tone ? `tone-${item.tone}` : ''"
         >
-          <BrandIcon
-            v-if="item.brand"
-            :name="item.brand"
-            :fallback="item.icon ?? item.title.slice(0, 1)"
-            :tile-class="item.tileClass"
-          />
-          <span v-else class="service-detail-symbol">{{ item.icon }}</span>
-          <div class="service-detail-card-copy">
-            <h3>{{ item.title }}</h3>
+          <header class="service-detail-card-head">
+            <BrandIcon
+              v-if="item.brand"
+              class="service-detail-card-icon"
+              :name="item.brand"
+              :fallback="item.icon ?? item.title.slice(0, 1)"
+            />
+            <span v-else class="service-detail-symbol service-detail-card-icon" :class="item.tone ? `tone-${item.tone}` : ''">{{ item.icon }}</span>
+            <div class="service-detail-card-title">
+              <p class="service-detail-card-kicker">{{ cardBadge(index) }}</p>
+              <h3>{{ item.title }}</h3>
+            </div>
+          </header>
+          <div class="service-detail-card-body">
             <p>{{ item.description }}</p>
             <small v-if="item.note">{{ item.note }}</small>
           </div>
@@ -93,9 +85,9 @@
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td><div class="service-spec-cell">{{ page.specTable.leftBody }}</div></td>
-            <td><div class="service-spec-cell">{{ page.specTable.rightBody }}</div></td>
+          <tr v-for="(row, index) in page.specTable.rows" :key="`${row.left}-${index}`">
+            <td><div class="service-spec-cell">{{ row.left }}</div></td>
+            <td><div class="service-spec-cell">{{ row.right }}</div></td>
           </tr>
         </tbody>
       </table>
@@ -168,7 +160,7 @@
       <p class="section-kicker">{{ sectionLabels.alerts }}</p>
       <div class="section-head">
         <h2>常见故障卡片</h2>
-        <p>把常见报错摊开，排查时更快定位。</p>
+        <p>把常见报错摊开，排查时更快定位</p>
       </div>
 
       <div class="incident-grid">
@@ -224,6 +216,12 @@ const pageTone = computed(() => {
   if (page.value.slug === "tool-development") return "purple";
   return "green";
 });
+
+function cardBadge(index: number) {
+  const prefix =
+    page.value.layout === "atelier" ? "DOC" : page.value.layout === "dashboard" ? "AI" : page.value.layout === "pipeline" ? "DEV" : "OPS";
+  return `${prefix} / ${String(index + 1).padStart(2, "0")}`;
+}
 
 type SectionLabels = {
   capabilities: string;
