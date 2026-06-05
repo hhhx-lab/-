@@ -1,4 +1,5 @@
 export type ServiceTone = "lime" | "blue" | "purple" | "orange" | "green" | "yellow" | "neutral";
+export type ServiceDetailLayout = "atelier" | "dashboard" | "pipeline" | "ops";
 
 export type ServiceDetailCard = {
   title: string;
@@ -26,8 +27,29 @@ export type ServiceDetailFaq = {
   answer: string;
 };
 
+export type ServiceDetailSpecTable = {
+  title: string;
+  lead: string;
+  leftTitle: string;
+  rightTitle: string;
+  leftBody: string;
+  rightBody: string;
+};
+
+export type ServiceDetailMode = {
+  key: string;
+  title: string;
+  description: string;
+};
+
+export type ServiceDetailAlert = {
+  code: string;
+  description: string;
+};
+
 export type ServiceDetailPage = {
   slug: string;
+  layout: ServiceDetailLayout;
   eyebrow: string;
   title: string;
   summary: string;
@@ -53,6 +75,9 @@ export type ServiceDetailPage = {
   faqTitle: string;
   faqLead: string;
   faq: ServiceDetailFaq[];
+  specTable?: ServiceDetailSpecTable;
+  modes?: ServiceDetailMode[];
+  alerts?: ServiceDetailAlert[];
   ctaTitle: string;
   ctaLead: string;
   ctaActionLabel: string;
@@ -62,6 +87,7 @@ export type ServiceDetailPage = {
 export const serviceDetailPages: Record<string, ServiceDetailPage> = {
   "document-processing": {
     slug: "document-processing",
+    layout: "atelier",
     eyebrow: "万能文档处理",
     title: "文档处理，把乱掉的材料重新收拾成能交的版本",
     summary: "PPT、Word、论文、PDF、图片转 Word、扫描件 OCR、格式修复和排版规范，都可以先发来。",
@@ -81,8 +107,8 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
       { title: "Word", description: "排版、目录、页码、样式和模板统一" },
       { title: "PDF / OCR", description: "扫描件、图片、PDF 转成可编辑版本" }
     ],
-    capabilitiesTitle: "我们可以试着处理的文档问题",
-    capabilitiesLead: "不只改格式，也能做转换、整理、重写和版式修复。",
+    capabilitiesTitle: "我们可以处理什么 / Capabilities",
+    capabilitiesLead: "PPT、Word、论文、PDF、图片转 Word、OCR、格式修复，先把材料发来再定路线。",
     capabilities: [
       {
         title: "PPT 制作与优化",
@@ -121,6 +147,16 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
         tone: "neutral"
       }
     ],
+    specTable: {
+      title: "规格交接矩阵 / Specs Matrix",
+      lead: "原始材料和交付结果分开列，先把输入输出说清楚。",
+      leftTitle: "用户需要提供什么",
+      rightTitle: "交付结果可以是什么",
+      leftBody:
+        "原始文件、截图、扫描件或资料包\n目标格式（Word / PPT / PDF / Excel）\n学校要求、参考模板或示例文件\n截止时间和最终用途",
+      rightBody:
+        "可编辑 Word / PPT / PDF\nOCR 后的文字稿、表格稿或结构化资料\n格式统一的论文、报告、方案、简历\n修改说明和后续使用建议"
+    },
     panelsTitle: "先把这三件事说清楚",
     panelsLead: "材料、结果和边界先讲明白，后面处理起来才快。",
     panels: [
@@ -140,7 +176,7 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
         items: ["低清扫描件和复杂公式不一定能 100% 还原", "表格、图片和版式转换时可能需要二次确认", "如果模板要求很严格，会先确认是否适合当前材料"]
       }
     ],
-    processTitle: "我们通常怎么处理",
+    processTitle: "处理路径 / Workflow",
     processLead: "先把文档拆成能落地的步骤，再开始做。",
     process: [
       { title: "发材料", description: "把文件、截图、样例和你的目标效果一起发来。" },
@@ -173,6 +209,7 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
 
   "ai-tools": {
     slug: "ai-tools",
+    layout: "dashboard",
     eyebrow: "AI 工具与海外服务配置",
     title: "把 ChatGPT、Gemini、Claude、Grok 和整套工具链配到能用",
     summary: "账号、订阅、API、中转站、Claude Code、Codex、Cursor、Antigravity、Telegram 等，都可以先来问。",
@@ -192,8 +229,8 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
       { title: "API / 中转", description: "Key、环境变量、代理、SDK 和调用方式都能配" },
       { title: "编程工具", description: "Claude Code、Codex、Cursor、Antigravity 也能配" }
     ],
-    capabilitiesTitle: "这些 AI 和海外工具，我们可以先帮你理顺",
-    capabilitiesLead: "有些是账号和订阅，有些是本地工具，有些是开发接入。",
+    capabilitiesTitle: "核心 AI 工具深度对齐 / Toolchain Dashboard",
+    capabilitiesLead: "先讲清楚每个工具是什么、强在哪，再看怎么接到你的环境里。",
     capabilities: [
       {
         title: "ChatGPT / OpenAI",
@@ -258,8 +295,8 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
         tone: "neutral"
       }
     ],
-    panelsTitle: "先把这三件事讲透",
-    panelsLead: "这样我们能更快判断：先注册、先订阅、先装工具，还是先配 API。",
+    panelsTitle: "酷里全包交付中心 / Infrastructure Core Nodes",
+    panelsLead: "账号、订阅、客户端和环境底座，通常会一起看。",
     panels: [
       {
         eyebrow: "你需要准备",
@@ -310,6 +347,7 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
 
   "tool-development": {
     slug: "tool-development",
+    layout: "pipeline",
     eyebrow: "小工具开发与全栈代做",
     title: "把想法做成能跑的网页、小程序、脚本或软件",
     summary: "网站、小程序、爬虫、数据看板、数据库、AI Agent、自动化工具，从 demo 到成品都可以做。",
@@ -328,8 +366,8 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
       { title: "脚本 / 爬虫", description: "重复劳动、采集、批处理和定时任务都能自动化" },
       { title: "数据库 / AI", description: "数据、权限、AI Agent 和工作流一起接起来" }
     ],
-    capabilitiesTitle: "这些开发类工作，我们都可以先试着做",
-    capabilitiesLead: "可以是 demo，也可以是后续能接着长大的成品。",
+    capabilitiesTitle: "全栈技术总线管线 / Data Bus Pipelines",
+    capabilitiesLead: "网站、小程序、脚本、数据库和 AI Agent，可以先拆成可落地的管线。",
     capabilities: [
       {
         title: "网站与网页应用",
@@ -380,8 +418,34 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
         tone: "yellow"
       }
     ],
-    panelsTitle: "先把需求讲透，后面就好做了",
-    panelsLead: "同样是开发，先做 demo 还是直接做成品，路径会很不一样。",
+    modes: [
+      {
+        key: "demo",
+        title: "先做 demo",
+        description:
+          "适合先看方向对不对。我们会先做一个最小可用版本，把核心流程跑通，再决定要不要继续往成品推进。"
+      },
+      {
+        key: "prod",
+        title: "直接做成品",
+        description:
+          "适合目标比较明确的项目。先把功能清单、数据结构、页面范围和验收标准讲清楚，再按成品标准落地。"
+      },
+      {
+        key: "legacy",
+        title: "接手半成品",
+        description:
+          "适合已有代码、模板或别人写了一半的项目。先看结构、依赖和报错，再判断怎么接得更顺。"
+      },
+      {
+        key: "long",
+        title: "长期迭代",
+        description:
+          "适合要持续更新的产品。可以按阶段拆功能、补权限、加支付、接后台统计，再慢慢长成完整系统。"
+      }
+    ],
+    panelsTitle: "灵活开发合作模式 / Development Delivery Paradigm",
+    panelsLead: "先做 demo 还是直接做成品，先看目标和边界，再决定路径。",
     panels: [
       {
         eyebrow: "你需要准备",
@@ -399,7 +463,7 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
         items: ["复杂项目会先拆最小可用版本", "旧项目、半成品也可以接手，但会先看代码状态", "如果要长期维护，会先把边界和节奏讲清楚"]
       }
     ],
-    processTitle: "小工具开发通常怎么走",
+    processTitle: "开发推进路径 / Build Flow",
     processLead: "先跑通核心流程，再决定要不要继续往成品长。",
     process: [
       { title: "先定目标", description: "把你想让工具帮你完成的事情讲出来。" },
@@ -432,6 +496,7 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
 
   "deployment-config": {
     slug: "deployment-config",
+    layout: "ops",
     eyebrow: "部署配置与服务器运维",
     title: "把服务器、域名、数据库和上线环境一次理顺",
     summary: "服务器部署、网站上线、VPN、堡垒机、母子网、云算力、域名申请和 DNS，都可以先问。",
@@ -451,8 +516,8 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
       { title: "HTTPS / 反代", description: "反向代理、网关、CORS 和访问路径都能配" },
       { title: "VPN / 堡垒机", description: "远程访问、内网互联和安全管理可以一起做" }
     ],
-    capabilitiesTitle: "部署配置里，我们通常会处理这些事",
-    capabilitiesLead: "从上线、网络到安全和备份，尽量都一起考虑。",
+    capabilitiesTitle: "模拟基础设施面板 / Infra Metrics Mock",
+    capabilitiesLead: "上线、网络、证书和备份这些点，最好先放在一块看。",
     capabilities: [
       {
         title: "网站与应用部署",
@@ -509,8 +574,8 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
         tone: "neutral"
       }
     ],
-    panelsTitle: "上线前，最好先把这三件事确认一下",
-    panelsLead: "现状、目标和限制先理顺，部署才不会来回返工。",
+    panelsTitle: "数据中心集群插槽 / Server Rack Operations Unit",
+    panelsLead: "把服务器、域名、VPN、数据库和云算力一项项拆开。",
     panels: [
       {
         eyebrow: "你需要准备",
@@ -528,8 +593,30 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
         items: ["账号权限和费用由客户确认", "不默认长期托管和持续代运维", "涉及敏感凭证时只做临时授权并及时更换", "合规场景下的 VPN / 远程访问才会继续往下配"]
       }
     ],
-    processTitle: "部署配置通常这样推进",
-    processLead: "先把现状和目标讲清楚，再决定配置顺序。",
+    alerts: [
+      {
+        code: "502 BAD GATEWAY",
+        description: "先看上游服务有没有活着、反向代理有没有把请求打到正确的端口。"
+      },
+      {
+        code: "504 TIMEOUT",
+        description: "多半是超时太短、任务太重或上游响应慢，先从网关和后端链路排。"
+      },
+      {
+        code: "CORS BLOCKED",
+        description: "检查请求域名、反代头和后端跨域配置，通常是路径或头部没对齐。"
+      },
+      {
+        code: "PORT OCCUPIED",
+        description: "通常是旧进程还在监听，先把占端口的服务和守护进程定位出来。"
+      },
+      {
+        code: "SSL EXPIRED",
+        description: "证书链或自动续期出了问题，优先看域名、ACME 和反代配置。"
+      }
+    ],
+    processTitle: "故障救火紧急演练 / Incident Resolution",
+    processLead: "先把常见告警摊开，排查时更快定位。",
     process: [
       { title: "说明现状", description: "告诉我们你现在有什么、卡在哪里、想达到什么效果。" },
       { title: "选方案", description: "先定服务器、网络、数据库、证书和访问方式。" },
@@ -559,4 +646,3 @@ export const serviceDetailPages: Record<string, ServiceDetailPage> = {
       "酷里可以协助服务器部署、网站上线、域名注册、DNS、HTTPS、VPN、堡垒机、数据库、云算力、反向代理和运维排查。"
   }
 };
-

@@ -1,5 +1,5 @@
 <template>
-  <section v-if="page" :key="page.slug" class="shell service-detail-shell">
+  <section v-if="page" :key="page.slug" class="shell service-detail-shell" :class="`service-layout-${page.layout}`">
     <NuxtLink class="back-link" to="/services">返回服务列表</NuxtLink>
 
     <section class="service-detail-hero" :class="`service-tone-${pageTone}`">
@@ -35,7 +35,21 @@
       </aside>
     </section>
 
+    <section v-if="page.layout === 'dashboard'" class="section service-terminal panel window">
+      <div class="window-label">
+        <strong>kuly@ai-cluster:~#</strong>
+        <span>Terminal Dashboard</span>
+      </div>
+      <div class="service-terminal-lines">
+        <p><span>kuly@ai-cluster:~#</span> inspect --service=ai_ecosystem</p>
+        <p>[OK] Deep validation for {{ page.capabilities.length }} dynamic cloud instances finished.</p>
+        <p><span>kuly@ai-cluster:~#</span> show --capabilities</p>
+        <p>[MATRIX] {{ page.capabilities.length }} core elements configured natively. Telemetry status: ONLINE</p>
+      </div>
+    </section>
+
     <section class="section service-section">
+      <p class="section-kicker">{{ sectionLabels.capabilities }}</p>
       <div class="section-head">
         <h2>{{ page.capabilitiesTitle }}</h2>
         <p>{{ page.capabilitiesLead }}</p>
@@ -64,7 +78,31 @@
       </div>
     </section>
 
-    <section class="section service-section">
+    <section v-if="page.specTable" class="section service-section service-spec-section">
+      <p class="section-kicker">{{ sectionLabels.spec }}</p>
+      <div class="section-head">
+        <h2>{{ page.specTable.title }}</h2>
+        <p>{{ page.specTable.lead }}</p>
+      </div>
+
+      <table class="kuly-table service-spec-table">
+        <thead>
+          <tr>
+            <th>{{ page.specTable.leftTitle }}</th>
+            <th>{{ page.specTable.rightTitle }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><div class="service-spec-cell">{{ page.specTable.leftBody }}</div></td>
+            <td><div class="service-spec-cell">{{ page.specTable.rightBody }}</div></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section v-if="page.layout === 'dashboard' || page.layout === 'ops'" class="section service-section">
+      <p class="section-kicker">{{ sectionLabels.panels }}</p>
       <div class="section-head">
         <h2>{{ page.panelsTitle }}</h2>
         <p>{{ page.panelsLead }}</p>
@@ -81,7 +119,35 @@
       </div>
     </section>
 
+    <section v-if="page.layout === 'pipeline'" class="section service-section">
+      <p class="section-kicker">{{ sectionLabels.modes }}</p>
+      <div class="section-head">
+        <h2>{{ page.panelsTitle }}</h2>
+        <p>{{ page.panelsLead }}</p>
+      </div>
+
+      <div class="bp-tabs service-mode-tabs">
+        <button
+          v-for="mode in page.modes ?? []"
+          :key="mode.key"
+          type="button"
+          class="bp-tab-btn"
+          :class="{ active: activeModeKey === mode.key }"
+          @click="activeModeKey = mode.key"
+        >
+          {{ mode.title }}
+        </button>
+      </div>
+      <div class="bp-tab-content service-mode-content">
+        <strong v-if="activeMode">[ {{ activeMode.title }} ]</strong>
+        <br v-if="activeMode" />
+        <br v-if="activeMode" />
+        <span v-if="activeMode">{{ activeMode.description }}</span>
+      </div>
+    </section>
+
     <section class="section service-section">
+      <p class="section-kicker">{{ sectionLabels.process }}</p>
       <div class="section-head">
         <h2>{{ page.processTitle }}</h2>
         <p>{{ page.processLead }}</p>
@@ -98,7 +164,23 @@
       </div>
     </section>
 
+    <section v-if="page.layout === 'ops' && page.alerts?.length" class="section service-section">
+      <p class="section-kicker">{{ sectionLabels.alerts }}</p>
+      <div class="section-head">
+        <h2>常见故障卡片</h2>
+        <p>把常见报错摊开，排查时更快定位。</p>
+      </div>
+
+      <div class="incident-grid">
+        <article v-for="item in page.alerts" :key="item.code" class="incident-card">
+          <strong>{{ item.code }}</strong>
+          <p>{{ item.description }}</p>
+        </article>
+      </div>
+    </section>
+
     <section id="detail-faq" class="section service-section">
+      <p class="section-kicker">{{ sectionLabels.faq }}</p>
       <div class="section-head">
         <h2>{{ page.faqTitle }}</h2>
         <p>{{ page.faqLead }}</p>
@@ -142,6 +224,72 @@ const pageTone = computed(() => {
   if (page.value.slug === "tool-development") return "purple";
   return "green";
 });
+
+type SectionLabels = {
+  capabilities: string;
+  panels: string;
+  spec: string;
+  modes: string;
+  alerts: string;
+  process: string;
+  faq: string;
+};
+
+const sectionLabels = computed<SectionLabels>(() => {
+  switch (page.value.layout) {
+    case "atelier":
+      return {
+        capabilities: "我们可以处理什么 / Capabilities",
+        panels: "",
+        spec: "规格交接矩阵 / Specs Matrix",
+        modes: "",
+        alerts: "",
+        process: "处理路径 / Workflow",
+        faq: "常见问题 / FAQ"
+      };
+    case "dashboard":
+      return {
+        capabilities: "核心 AI 工具深度对齐 / Toolchain Dashboard",
+        panels: "酷里全包交付中心 / Infrastructure Core Nodes",
+        spec: "",
+        modes: "",
+        alerts: "",
+        process: "AI 工具通常这样处理",
+        faq: "常见问题 / FAQ"
+      };
+    case "pipeline":
+      return {
+        capabilities: "全栈技术总线管线 / Data Bus Pipelines",
+        panels: "",
+        spec: "",
+        modes: "灵活开发合作模式 / Development Delivery Paradigm",
+        alerts: "",
+        process: "开发推进路径 / Build Flow",
+        faq: "常见问题 / FAQ"
+      };
+    case "ops":
+      return {
+        capabilities: "模拟基础设施面板 / Infra Metrics Mock",
+        panels: "数据中心集群插槽 / Server Rack Operations Unit",
+        spec: "",
+        modes: "",
+        alerts: "故障救火紧急演练 / Incident Resolution",
+        process: "部署推进路径 / Build Flow",
+        faq: "常见问题 / FAQ"
+      };
+  }
+});
+
+const activeModeKey = ref("");
+watch(
+  () => page.value.slug,
+  () => {
+    activeModeKey.value = page.value.modes?.[0]?.key ?? "";
+  },
+  { immediate: true }
+);
+
+const activeMode = computed(() => page.value.modes?.find((item) => item.key === activeModeKey.value) ?? null);
 
 const seoPath = computed(() => `/services/${slug.value}`);
 
