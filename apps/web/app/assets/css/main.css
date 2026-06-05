@@ -1799,7 +1799,7 @@ textarea {
 
 .service-detail-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
   gap: 20px;
   align-items: start;
   padding: clamp(24px, 4vw, 40px);
@@ -1828,12 +1828,20 @@ textarea {
 .service-hero-copy {
   display: grid;
   gap: 16px;
+  min-width: 0;
+}
+
+.service-hero-aside {
+  min-width: 0;
 }
 
 .service-detail-hero .mega {
   margin-bottom: 0;
-  font-size: 64px;
-  line-height: 1.04;
+  font-size: clamp(48px, 4.3vw, 64px);
+  line-height: 1.06;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
 .service-detail-hero .lead {
