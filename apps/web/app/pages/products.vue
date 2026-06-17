@@ -6,8 +6,9 @@
       <p class="lead">这里集中展示可用入口和上线计划，帮助你更快找到当前能用的服务路径</p>
     </div>
     <div class="product-console">
-      <span class="plain-label">上线顺序</span>
-      <p>先做服务入口，再逐步补工具</p>
+      <span class="plain-label">已接入工具</span>
+      <strong>Handwriting</strong>
+      <p>文档转手写字体工作台已作为子产品接入，适合先预览、再生成可交付稿</p>
     </div>
   </section>
 
@@ -53,13 +54,13 @@ const products: Array<{ title: string; description: string; kind: string; status
     cta: "了解小酷"
   },
   {
-    title: "文档处理工具箱",
-    description: "面向 PDF、PPT、表格和批量处理的轻量工具集合，后续逐步上线。",
-    kind: "效率工具",
-    status: "planned",
-    to: "/services/document-processing",
-    docs: "/help?doc=faq",
-    cta: "看相关服务"
+    title: "文档转手写字体",
+    description: "把 PDF、Word、Markdown 或文本整理成手写风格稿件，支持字体、纸张、行距和整页预览。",
+    kind: "文档工具",
+    status: "beta",
+    to: "/products/handwriting",
+    docs: "/services/document-processing",
+    cta: "进入子产品"
   },
   {
     title: "部署检查清单",
