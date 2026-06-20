@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     smtp_timeout_seconds: int = 20
     email_verify_token_expire_minutes: int = 60
     password_reset_token_expire_minutes: int = 30
+    auth_code_expire_seconds: int = 60
     notification_max_retries: int = 3
     max_request_body_bytes: int = 2 * 1024 * 1024
 

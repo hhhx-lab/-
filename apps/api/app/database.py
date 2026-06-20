@@ -119,9 +119,25 @@ def _ensure_local_schema_compat(active_engine: Engine) -> None:
                 "email_verified_at": "VARCHAR(64)",
                 "failed_login_count": "INTEGER NOT NULL DEFAULT 0",
                 "locked_until": "VARCHAR(64)",
+                "registered_ip": "VARCHAR(80)",
             }.items():
                 if name not in columns:
                     connection.exec_driver_sql(f"ALTER TABLE users ADD COLUMN {name} {ddl}")
+        if not inspector.has_table("auth_email_codes"):
+            connection.exec_driver_sql(
+                """
+                CREATE TABLE auth_email_codes (
+                    id VARCHAR(64) PRIMARY KEY,
+                    email VARCHAR(255) NOT NULL,
+                    purpose VARCHAR(40) NOT NULL,
+                    code_hash VARCHAR(128) NOT NULL,
+                    expires_at VARCHAR(64) NOT NULL,
+                    used_at VARCHAR(64),
+                    created_ip VARCHAR(80) NOT NULL DEFAULT '',
+                    created_at VARCHAR(64) NOT NULL
+                )
+                """
+            )
         if inspector.has_table("notification_events"):
             columns = {column["name"] for column in inspector.get_columns("notification_events")}
             for name, ddl in {

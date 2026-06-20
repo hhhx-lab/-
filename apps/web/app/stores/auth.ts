@@ -40,7 +40,7 @@ export const useAuthStore = defineStore("auth", {
       tokenCookie.value = result.token;
       localStorage.setItem("kuli-v2-token", result.token);
     },
-    async register(input: { email: string; password: string; displayName: string; referralCode?: string }) {
+    async register(input: { email: string; password: string; displayName: string; verificationCode: string; referralCode?: string }) {
       const api = useApi();
       const result = await api.register(input);
       this.token = result.token;

@@ -13,6 +13,7 @@ from app.database import configure_database, init_database
 from app.main import app
 from app.models.entities import KnowledgeEmbedding
 from app.services.storage import create_presigned_download, create_presigned_upload, local_object_path
+from tests.auth_helpers import register_user
 
 
 @pytest.fixture
@@ -48,9 +49,11 @@ async def test_public_registration_profile_summary_referral_and_order_gate(clien
     )
     assert unauth_order.status_code == 401
 
-    inviter = await client.post(
-        "/api/auth/register",
-        json={"email": "inviter@example.com", "password": "Invite123!", "displayName": "邀请人", "role": "admin"},
+    inviter = await register_user(
+        client,
+        email="inviter@example.com",
+        password="Invite123!",
+        display_name="邀请人",
     )
     assert inviter.status_code == 201
     inviter_body = inviter.json()
@@ -65,9 +68,12 @@ async def test_public_registration_profile_summary_referral_and_order_gate(clien
     assert profile.json()["profile"]["referralCode"]
 
     referral_code = profile.json()["profile"]["referralCode"]
-    invited = await client.post(
-        "/api/auth/register",
-        json={"email": "invited@example.com", "password": "Invite456!", "displayName": "被邀请人", "referralCode": referral_code},
+    invited = await register_user(
+        client,
+        email="invited@example.com",
+        password="Invite456!",
+        display_name="被邀请人",
+        referral_code=referral_code,
     )
     assert invited.status_code == 201
 

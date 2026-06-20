@@ -329,14 +329,14 @@ async def test_order_lifecycle_and_referral_actions_create_notifications(client:
     assert "order_accepted" in admin_types
 
     referral_code = user_referral_code("demo@kuli.local")
-    register = await client.post(
-        "/api/auth/register",
-        json={
-            "email": "referred-user@example.com",
-            "password": "ReferredUser123!",
-            "displayName": "被邀请用户",
-            "referralCode": referral_code,
-        },
+    from tests.auth_helpers import register_user
+
+    register = await register_user(
+        client,
+        email="referred-user@example.com",
+        password="ReferredUser123!",
+        display_name="被邀请用户",
+        referral_code=referral_code,
     )
     assert register.status_code == 201
 

@@ -13,9 +13,14 @@ class AuthIn(BaseModel):
     password: str
 
 
+class EmailCodeRequestIn(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+
+
 class RegisterIn(AuthIn):
     displayName: str = Field(min_length=1, max_length=80)
     referralCode: str | None = Field(default=None, max_length=40)
+    verificationCode: str = Field(min_length=6, max_length=6)
 
 
 class AuthOut(BaseModel):
@@ -36,7 +41,9 @@ class PasswordResetRequestIn(BaseModel):
     email: str = Field(min_length=3, max_length=255)
 
 
-class PasswordResetConfirmIn(TokenConfirmIn):
+class PasswordResetConfirmIn(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    verificationCode: str = Field(min_length=6, max_length=6)
     password: str
 
 

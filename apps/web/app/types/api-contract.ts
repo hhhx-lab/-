@@ -105,7 +105,7 @@ export type OrdersOut = { orders: OrderOut[] };
 
 export type PaginationOut = { page: number; pageSize: number; total: number; hasMore: boolean };
 
-export type PasswordResetConfirmIn = { token: string; password: string };
+export type PasswordResetConfirmIn = { email: string; verificationCode: string; password: string };
 
 export type PasswordResetRequestIn = { email: string };
 
@@ -125,7 +125,9 @@ export type QuoteInput = { amount: number; kind?: string; note: string };
 
 export type QuoteOut = { id: string; amount: number; kind: string; note: string; status: string; createdAt: string };
 
-export type RegisterIn = { email: string; password: string; displayName: string; referralCode?: string | null };
+export type EmailCodeRequestIn = { email: string };
+
+export type RegisterIn = { email: string; password: string; displayName: string; referralCode?: string | null; verificationCode: string };
 
 export type ServiceEnvelope = { service: ServiceOut };
 
@@ -213,6 +215,9 @@ export type ApiPaths = {
   };
   "/api/auth/register": {
     post: { request: RegisterIn; response: AuthOut };
+  };
+  "/api/auth/register/send-code": {
+    post: { request: EmailCodeRequestIn; response: StatusOut };
   };
   "/api/dev/reset-security-rate-limits": {
     post: { response: StatusOut };

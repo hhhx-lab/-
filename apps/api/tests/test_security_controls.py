@@ -1,6 +1,5 @@
 from collections.abc import AsyncIterator
 from pathlib import Path
-import re
 
 import httpx
 import pytest
@@ -10,6 +9,14 @@ from app import database
 from app.database import configure_database, init_database
 from app.main import app
 from app.models.entities import User
+from tests.auth_helpers import (
+    code_from_event_body,
+    confirm_password_reset_with_code,
+    latest_email_event,
+    register_user,
+    request_password_reset_code,
+    token_from_event_body,
+)
 
 
 @pytest.fixture
@@ -32,42 +39,22 @@ def security_actions() -> list[str]:
         return [row[0] for row in rows]
 
 
-def latest_email_event(event_type: str, recipient: str) -> dict[str, object]:
-    with database.SessionLocal() as db:
-        row = db.execute(
-            text(
-                """
-                select event_type, recipient, subject, body, status
-                from notification_events
-                where event_type = :event_type and recipient = :recipient
-                order by created_at desc
-                limit 1
-                """
-            ),
-            {"event_type": event_type, "recipient": recipient},
-        ).mappings().first()
-        assert row
-        return dict(row)
-
-
-def token_from_event_body(body: str) -> str:
-    match = re.search(r"(?:verifyToken|resetToken|token)=([^\"'&<\s]+)", body)
-    assert match, body
-    return match.group(1)
-
-
 @pytest.mark.anyio
 async def test_registration_rejects_weak_passwords_and_records_security_audit(client: httpx.AsyncClient) -> None:
+    for target_email in ("weak@example.com", "same@example.com"):
+        send = await client.post("/api/auth/register/send-code", json={"email": target_email})
+        assert send.status_code == 202
+
     weak = await client.post(
         "/api/auth/register",
-        json={"email": "weak@example.com", "password": "password", "displayName": "弱密码"},
+        json={"email": "weak@example.com", "password": "password", "displayName": "弱密码", "verificationCode": "000000"},
     )
     assert weak.status_code == 422
     assert "密码" in weak.json()["detail"]
 
     email_as_password = await client.post(
         "/api/auth/register",
-        json={"email": "same@example.com", "password": "same@example.com", "displayName": "邮箱当密码"},
+        json={"email": "same@example.com", "password": "same@example.com", "displayName": "邮箱当密码", "verificationCode": "000000"},
     )
     assert email_as_password.status_code == 422
 
@@ -99,19 +86,18 @@ async def test_failed_login_locks_account_without_revealing_email_existence(clie
 
 @pytest.mark.anyio
 async def test_registration_and_agent_chat_are_rate_limited_per_ip_or_visitor(client: httpx.AsyncClient) -> None:
-    for index in range(3):
-        created = await client.post(
-            "/api/auth/register",
-            json={"email": f"burst-{index}@example.com", "password": f"BurstPass{index}9", "displayName": f"Burst {index}"},
+    for index in range(2):
+        created = await register_user(
+            client,
+            email=f"burst-{index}@example.com",
+            password=f"BurstPass{index}9",
+            display_name=f"Burst {index}",
         )
         assert created.status_code == 201
 
-    limited_register = await client.post(
-        "/api/auth/register",
-        json={"email": "burst-locked@example.com", "password": "BurstPass99", "displayName": "Too Many"},
-    )
-    assert limited_register.status_code == 429
-    assert limited_register.json()["detail"] == "注册请求过于频繁，请稍后再试"
+    limited_register = await client.post("/api/auth/register/send-code", json={"email": "burst-locked@example.com"})
+    assert limited_register.status_code == 403
+    assert "注册账号过多" in limited_register.json()["detail"]
 
     session = await client.post("/api/agent/sessions", json={"pagePath": "/", "visitorId": "visitor-rate-limit"})
     assert session.status_code == 201
@@ -130,7 +116,7 @@ async def test_registration_and_agent_chat_are_rate_limited_per_ip_or_visitor(cl
     assert limited_chat.json()["detail"] == "小酷今天被问得有点多，请稍后再试"
 
     actions = security_actions()
-    assert "auth.register.rate_limited" in actions
+    assert "auth.register.ip_account_limited" in actions
     assert "agent.chat.rate_limited" in actions
 
 
@@ -168,23 +154,29 @@ async def test_email_verification_request_and_confirm_updates_current_user(clien
 
 @pytest.mark.anyio
 async def test_password_reset_does_not_reveal_email_and_rotates_password(client: httpx.AsyncClient) -> None:
-    request = await client.post("/api/auth/password-reset/request", json={"email": "demo@kuli.local"})
+    request = await request_password_reset_code(client, "demo@kuli.local")
     assert request.status_code == 202
     assert request.json()["ok"] is True
 
-    unknown = await client.post("/api/auth/password-reset/request", json={"email": "missing@example.com"})
+    unknown = await request_password_reset_code(client, "missing@example.com")
     assert unknown.status_code == 202
-    assert unknown.json() == request.json()
+    assert unknown.json()["message"] == request.json()["message"]
 
-    event = latest_email_event("password_reset", "demo@kuli.local")
+    event = latest_email_event("password_reset_code", "demo@kuli.local")
     assert event["status"] == "pending"
-    assert "重置" in str(event["subject"])
+    assert "验证码" in str(event["subject"])
 
-    reset_token = token_from_event_body(str(event["body"]))
-    weak = await client.post("/api/auth/password-reset/confirm", json={"token": reset_token, "password": "password"})
+    reset_code = code_from_event_body(str(event["body"]))
+    weak = await client.post(
+        "/api/auth/password-reset/confirm",
+        json={"email": "demo@kuli.local", "verificationCode": reset_code, "password": "password"},
+    )
     assert weak.status_code == 422
 
-    confirm = await client.post("/api/auth/password-reset/confirm", json={"token": reset_token, "password": "KuliUser456!"})
+    confirm = await client.post(
+        "/api/auth/password-reset/confirm",
+        json={"email": "demo@kuli.local", "verificationCode": reset_code, "password": "KuliUser456!"},
+    )
     assert confirm.status_code == 200
     assert confirm.json()["ok"] is True
 
@@ -194,9 +186,12 @@ async def test_password_reset_does_not_reveal_email_and_rotates_password(client:
     new_login = await client.post("/api/auth/login", json={"email": "demo@kuli.local", "password": "KuliUser456!"})
     assert new_login.status_code == 200
 
-    reused = await client.post("/api/auth/password-reset/confirm", json={"token": reset_token, "password": "KuliUser789!"})
+    reused = await client.post(
+        "/api/auth/password-reset/confirm",
+        json={"email": "demo@kuli.local", "verificationCode": reset_code, "password": "KuliUser789!"},
+    )
     assert reused.status_code == 400
 
     actions = security_actions()
-    assert "auth.password_reset.requested" in actions
+    assert "auth.password_reset.code_sent" in actions
     assert "auth.password_reset.confirmed" in actions

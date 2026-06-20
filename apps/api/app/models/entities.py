@@ -54,6 +54,20 @@ class User(Base):
     email_verified_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
     failed_login_count: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    registered_ip: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
+    created_at: Mapped[str] = mapped_column(String(64), default=now_iso)
+
+
+class AuthEmailCode(Base):
+    __tablename__ = "auth_email_codes"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=new_id)
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    purpose: Mapped[str] = mapped_column(String(40), index=True)
+    code_hash: Mapped[str] = mapped_column(String(128), index=True)
+    expires_at: Mapped[str] = mapped_column(String(64))
+    used_at: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_ip: Mapped[str] = mapped_column(String(80), default="")
     created_at: Mapped[str] = mapped_column(String(64), default=now_iso)
 
 

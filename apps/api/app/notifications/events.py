@@ -218,3 +218,36 @@ def create_password_reset_event(db: Session, *, user: User, token: str, base_url
     db.add(event)
     db.flush()
     return event
+
+
+def create_register_code_event(db: Session, *, email: str, code: str) -> NotificationEvent:
+    body = f"你的酷里注册验证码是 {code}，请在 60 秒内完成验证。如非本人操作请忽略。"
+    event = NotificationEvent(
+        event_type="register_verification",
+        channel="email",
+        recipient=email,
+        subject="酷里注册验证码",
+        body=body,
+        status="pending",
+        idempotency_key=f"register_verification:{email}:{code}",
+    )
+    db.add(event)
+    db.flush()
+    return event
+
+
+def create_password_reset_code_event(db: Session, *, user: User, code: str) -> NotificationEvent:
+    body = f"你的酷里密码重置验证码是 {code}，请在 60 秒内完成验证。如非本人操作请忽略。"
+    event = NotificationEvent(
+        event_type="password_reset_code",
+        user_id=user.id,
+        channel="email",
+        recipient=user.email,
+        subject="酷里密码重置验证码",
+        body=body,
+        status="pending",
+        idempotency_key=f"password_reset_code:{user.id}:{code}",
+    )
+    db.add(event)
+    db.flush()
+    return event

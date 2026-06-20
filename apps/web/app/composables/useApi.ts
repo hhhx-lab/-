@@ -93,7 +93,9 @@ export function useApi() {
       }),
     login: (email: string, password: string) =>
       request<ApiResponse<"/api/auth/login", "post">>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
-    register: (input: { email: string; password: string; displayName: string; referralCode?: string }) =>
+    sendRegisterCode: (email: string) =>
+      request<{ ok: boolean; message: string }>("/api/auth/register/send-code", { method: "POST", body: JSON.stringify({ email }) }),
+    register: (input: { email: string; password: string; displayName: string; verificationCode: string; referralCode?: string }) =>
       request<ApiResponse<"/api/auth/register", "post">>("/api/auth/register", { method: "POST", body: JSON.stringify(input) }),
     me: (token: string) => request<ApiResponse<"/api/auth/me", "get">>("/api/auth/me", { token }),
     requestEmailVerification: (token: string) =>
@@ -102,7 +104,7 @@ export function useApi() {
       request<{ ok: boolean; message: string }>("/api/auth/email-verification/confirm", { method: "POST", body: JSON.stringify(input) }),
     requestPasswordReset: (email: string) =>
       request<{ ok: boolean; message: string }>("/api/auth/password-reset/request", { method: "POST", body: JSON.stringify({ email }) }),
-    confirmPasswordReset: (input: { token: string; password: string }) =>
+    confirmPasswordReset: (input: { email: string; verificationCode: string; password: string }) =>
       request<{ ok: boolean; message: string }>("/api/auth/password-reset/confirm", { method: "POST", body: JSON.stringify(input) }),
     getProfile: (token: string) => request<{ profile: UserProfile }>("/api/me/profile", { token }),
     updateProfile: (token: string, input: { displayName: string; otherContact: string }) =>

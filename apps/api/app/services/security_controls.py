@@ -17,6 +17,9 @@ LOGIN_LOCK_FAILURES = 5
 LOGIN_LOCK_MINUTES = 15
 REGISTER_IP_LIMIT = 3
 REGISTER_IP_WINDOW_SECONDS = 10 * 60
+REGISTER_MAX_ACCOUNTS_PER_IP = 2
+AUTH_CODE_SEND_LIMIT = 5
+AUTH_CODE_SEND_WINDOW_SECONDS = 10 * 60
 AGENT_VISITOR_DAILY_LIMIT = 5
 AGENT_USER_DAILY_LIMIT = 40
 
@@ -78,6 +81,35 @@ def check_register_rate_limit(db: Session, ip_address: str) -> bool:
     allowed = rate_limiter.hit(f"register:{ip_address}", limit=REGISTER_IP_LIMIT, window_seconds=REGISTER_IP_WINDOW_SECONDS)
     if not allowed:
         record_security_event(db, action="auth.register.rate_limited", ip_address=ip_address)
+        db.commit()
+    return allowed
+
+
+def count_accounts_by_ip(db: Session, ip_address: str) -> int:
+    if not ip_address or ip_address == "unknown":
+        return 0
+    return db.query(User).filter(User.registered_ip == ip_address).count()
+
+
+def check_ip_account_limit(db: Session, ip_address: str) -> bool:
+    allowed = count_accounts_by_ip(db, ip_address) < REGISTER_MAX_ACCOUNTS_PER_IP
+    if not allowed:
+        record_security_event(db, action="auth.register.ip_account_limited", ip_address=ip_address)
+        db.commit()
+    return allowed
+
+
+def check_auth_code_send_rate_limit(db: Session, *, ip_address: str, email: str, purpose: str) -> bool:
+    key = f"auth_code:{purpose}:{ip_address}:{email.lower().strip()}"
+    allowed = rate_limiter.hit(key, limit=AUTH_CODE_SEND_LIMIT, window_seconds=AUTH_CODE_SEND_WINDOW_SECONDS)
+    if not allowed:
+        record_security_event(
+            db,
+            action="auth.code_send.rate_limited",
+            email=email.lower().strip(),
+            ip_address=ip_address,
+            details={"purpose": purpose},
+        )
         db.commit()
     return allowed
 

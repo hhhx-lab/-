@@ -34,7 +34,9 @@ from app.notifications.events import (
     create_email_verification_event,
     create_order_customer_notification,
     create_order_message_notification,
+    create_password_reset_code_event,
     create_password_reset_event,
+    create_register_code_event,
     create_referral_reward_notification,
 )
 from app.notifications.in_app import list_notifications, mark_all_read, mark_read, serialize_notification, unread_count
@@ -69,6 +71,7 @@ from app.schemas.api import (
     OrdersOut,
     PolishOut,
     PaymentInput,
+    EmailCodeRequestIn,
     PasswordResetConfirmIn,
     PasswordResetRequestIn,
     PresignedUploadEnvelope,
@@ -88,6 +91,13 @@ from app.schemas.api import (
     UploadPresignInput,
 )
 from app.security import hash_password, sign_token, verify_password, verify_token
+from app.services.auth_codes import (
+    AUTH_CODE_PURPOSE_PASSWORD_RESET,
+    AUTH_CODE_PURPOSE_REGISTER,
+    find_active_auth_email_code,
+    issue_auth_email_code,
+    mark_auth_email_code_used,
+)
 from app.services.auth_tokens import (
     find_active_email_verification_token,
     find_active_password_reset_token,
@@ -103,6 +113,8 @@ from app.services.knowledge import serialize_knowledge_article
 from app.services.rag import search_knowledge
 from app.services.security_controls import (
     check_agent_rate_limit,
+    check_auth_code_send_rate_limit,
+    check_ip_account_limit,
     check_register_rate_limit,
     client_ip,
     is_locked,
@@ -170,7 +182,10 @@ def enqueue_notification_event(event_id: str) -> None:
     try:
         send_notification_event.delay(event_id)
     except Exception:  # noqa: BLE001 - email queue failure must not break order/auth flows
-        pass
+        if get_settings().app_env in {"local", "dev", "development"}:
+            from app.tasks.notification_tasks import send_notification_event_sync
+
+            send_notification_event_sync(event_id)
 
 
 def enqueue_notification_events(event_ids: list[str]) -> None:
@@ -567,28 +582,58 @@ def login(input_data: AuthIn, request: Request, db: Session = Depends(get_db)) -
     return auth_response(user)
 
 
+@app.post("/api/auth/register/send-code", status_code=202, response_model=StatusOut)
+def send_register_code(input_data: EmailCodeRequestIn, request: Request, db: Session = Depends(get_db)) -> dict[str, object]:
+    ip_address = client_ip(request)
+    email = input_data.email.lower().strip()
+    if db.query(User).filter(User.email.ilike(email)).first():
+        raise HTTPException(status_code=409, detail="该邮箱已注册，请直接登录")
+    if not check_ip_account_limit(db, ip_address):
+        raise HTTPException(status_code=403, detail="当前网络已注册账号过多，请稍后再试或联系酷里")
+    if not check_auth_code_send_rate_limit(db, ip_address=ip_address, email=email, purpose=AUTH_CODE_PURPOSE_REGISTER):
+        raise HTTPException(status_code=429, detail="验证码发送过于频繁，请稍后再试")
+    code = issue_auth_email_code(db, email=email, purpose=AUTH_CODE_PURPOSE_REGISTER, ip_address=ip_address)
+    event = create_register_code_event(db, email=email, code=code)
+    record_security_event(db, action="auth.register.code_sent", email=email, ip_address=ip_address)
+    db.commit()
+    enqueue_notification_event(event.id)
+    return {"ok": True, "message": "验证码已发送，请在 60 秒内完成验证"}
+
+
 @app.post("/api/auth/register", status_code=201, response_model=AuthOut)
 def register(input_data: RegisterIn, request: Request, db: Session = Depends(get_db)) -> AuthOut:
     ip_address = client_ip(request)
+    email = input_data.email.lower().strip()
     if not check_register_rate_limit(db, ip_address):
         raise HTTPException(status_code=429, detail="注册请求过于频繁，请稍后再试")
+    if not check_ip_account_limit(db, ip_address):
+        raise HTTPException(status_code=403, detail="当前网络已注册账号过多，请稍后再试或联系酷里")
     password_error = validate_password(input_data.email, input_data.password)
     if password_error:
-        record_security_event(db, action="auth.register.weak_password", email=input_data.email.lower(), ip_address=ip_address, details={"reason": password_error})
+        record_security_event(db, action="auth.register.weak_password", email=email, ip_address=ip_address, details={"reason": password_error})
         db.commit()
         raise HTTPException(status_code=422, detail=password_error)
-    if db.query(User).filter(User.email.ilike(input_data.email)).first():
-        raise HTTPException(status_code=409, detail="邮箱已注册")
+    if db.query(User).filter(User.email.ilike(email)).first():
+        raise HTTPException(status_code=409, detail="该邮箱已注册，请直接登录")
+    code_row = find_active_auth_email_code(db, email=email, purpose=AUTH_CODE_PURPOSE_REGISTER, code=input_data.verificationCode)
+    if not code_row:
+        record_security_event(db, action="auth.register.invalid_code", email=email, ip_address=ip_address)
+        db.commit()
+        raise HTTPException(status_code=400, detail="验证码无效或已过期，请重新获取")
+    mark_auth_email_code_used(code_row)
+    db.add(code_row)
     referrer = None
     if input_data.referralCode:
         referrer = db.query(User).filter(User.referral_code == input_data.referralCode.strip().upper()).first()
     user = User(
-        email=input_data.email.lower(),
+        email=email,
         password_hash=hash_password(input_data.password),
         display_name=input_data.displayName,
         role="user",
         referral_code=next_referral_code(db, input_data.email),
         referred_by_user_id=referrer.id if referrer else None,
+        email_verified_at=now_iso(),
+        registered_ip=ip_address,
     )
     db.add(user)
     db.flush()
@@ -598,6 +643,7 @@ def register(input_data: RegisterIn, request: Request, db: Session = Depends(get
         db.add(ReferralReward(referrer_user_id=referrer.id, referred_user_id=user.id, points=20))
         _, event = create_referral_reward_notification(db, referrer=referrer, referred_user=user, points=20)
         notification_event_ids.append(event.id)
+    record_security_event(db, action="auth.register.completed", user_id=user.id, email=email, ip_address=ip_address)
     db.commit()
     enqueue_notification_events(notification_event_ids)
     db.refresh(user)
@@ -649,13 +695,16 @@ def confirm_email_verification(input_data: TokenConfirmIn, db: Session = Depends
 @app.post("/api/auth/password-reset/request", status_code=202, response_model=StatusOut)
 def request_password_reset(input_data: PasswordResetRequestIn, request: Request, db: Session = Depends(get_db)) -> dict[str, object]:
     ip_address = client_ip(request)
-    user = db.query(User).filter(User.email.ilike(input_data.email)).first()
+    email = input_data.email.lower().strip()
+    user = db.query(User).filter(User.email.ilike(email)).first()
     if user:
-        token, _ = issue_password_reset_token(db, user=user, ip_address=ip_address)
-        event = create_password_reset_event(db, user=user, token=token, base_url=frontend_base_url(request))
+        if not check_auth_code_send_rate_limit(db, ip_address=ip_address, email=email, purpose=AUTH_CODE_PURPOSE_PASSWORD_RESET):
+            raise HTTPException(status_code=429, detail="验证码发送过于频繁，请稍后再试")
+        code = issue_auth_email_code(db, email=email, purpose=AUTH_CODE_PURPOSE_PASSWORD_RESET, ip_address=ip_address)
+        event = create_password_reset_code_event(db, user=user, code=code)
         record_security_event(
             db,
-            action="auth.password_reset.requested",
+            action="auth.password_reset.code_sent",
             user_id=user.id,
             email=user.email,
             ip_address=ip_address,
@@ -666,33 +715,37 @@ def request_password_reset(input_data: PasswordResetRequestIn, request: Request,
         record_security_event(
             db,
             action="auth.password_reset.requested_unknown",
-            email=input_data.email.lower(),
+            email=email,
             ip_address=ip_address,
         )
         db.commit()
-    return {"ok": True, "message": "如果邮箱存在，重置邮件已经发出。"}
+    return {"ok": True, "message": "如果邮箱存在，验证码已经发出，请在 60 秒内完成验证"}
 
 
 @app.post("/api/auth/password-reset/confirm", response_model=StatusOut)
 def confirm_password_reset(input_data: PasswordResetConfirmIn, db: Session = Depends(get_db)) -> dict[str, object]:
-    token_row = find_active_password_reset_token(db, input_data.token)
-    if not token_row:
-        raise HTTPException(status_code=400, detail="重置 token 无效或已过期")
-    user = db.get(User, token_row.user_id)
+    email = input_data.email.lower().strip()
+    user = db.query(User).filter(User.email.ilike(email)).first()
     if not user:
-        raise HTTPException(status_code=400, detail="重置 token 无效或已过期")
+        raise HTTPException(status_code=400, detail="验证码无效或已过期")
     password_error = validate_password(user.email, input_data.password)
     if password_error:
         record_security_event(db, action="auth.password_reset.weak_password", user_id=user.id, email=user.email, details={"reason": password_error})
         db.commit()
         raise HTTPException(status_code=422, detail=password_error)
+    code_row = find_active_auth_email_code(db, email=email, purpose=AUTH_CODE_PURPOSE_PASSWORD_RESET, code=input_data.verificationCode)
+    if not code_row:
+        record_security_event(db, action="auth.password_reset.invalid_code", user_id=user.id, email=user.email)
+        db.commit()
+        raise HTTPException(status_code=400, detail="验证码无效或已过期，请重新获取")
+    mark_auth_email_code_used(code_row)
+    db.add(code_row)
     user.password_hash = hash_password(input_data.password)
     user.failed_login_count = 0
     user.locked_until = None
-    mark_token_used(token_row)
     record_security_event(db, action="auth.password_reset.confirmed", user_id=user.id, email=user.email)
     db.commit()
-    return {"ok": True, "message": "密码已重置"}
+    return {"ok": True, "message": "密码已重置，请使用新密码登录"}
 
 
 @app.get("/api/me/profile", response_model=UserProfileEnvelope)
