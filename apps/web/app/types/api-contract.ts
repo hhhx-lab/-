@@ -127,6 +127,8 @@ export type QuoteOut = { id: string; amount: number; kind: string; note: string;
 
 export type EmailCodeRequestIn = { email: string };
 
+export type EmailVerificationConfirmIn = { email: string; verificationCode: string };
+
 export type RegisterIn = { email: string; password: string; displayName: string; referralCode?: string | null; verificationCode: string };
 
 export type ServiceEnvelope = { service: ServiceOut };
@@ -136,8 +138,6 @@ export type ServiceOut = { slug: string; title: string; tag: string; summary: st
 export type ServicesOut = { services: ServiceOut[] };
 
 export type StatusOut = { ok: boolean; message: string };
-
-export type TokenConfirmIn = { token: string };
 
 export type UploadPresignInput = { fileName: string; fileSize: number; contentType: string; orderNumber?: string | null };
 
@@ -196,7 +196,7 @@ export type ApiPaths = {
     post: { request: PolishInput; response: PolishOut };
   };
   "/api/auth/email-verification/confirm": {
-    post: { request: TokenConfirmIn; response: StatusOut };
+    post: { request: EmailVerificationConfirmIn; response: StatusOut };
   };
   "/api/auth/email-verification/request": {
     post: { response: StatusOut };

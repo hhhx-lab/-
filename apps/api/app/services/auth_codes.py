@@ -10,6 +10,7 @@ from app.services.auth_tokens import hash_auth_token
 
 AUTH_CODE_PURPOSE_REGISTER = "register"
 AUTH_CODE_PURPOSE_PASSWORD_RESET = "password_reset"
+AUTH_CODE_PURPOSE_EMAIL_VERIFICATION = "email_verification"
 
 
 def issue_auth_email_code(db: Session, *, email: str, purpose: str, ip_address: str) -> str:

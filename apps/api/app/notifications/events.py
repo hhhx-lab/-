@@ -186,17 +186,17 @@ def create_order_message_notification(
     return notification, event
 
 
-def create_email_verification_event(db: Session, *, user: User, token: str, base_url: str) -> NotificationEvent:
-    verify_url = f"{base_url.rstrip('/')}/login?verifyToken={quote(token)}"
+def create_email_verification_event(db: Session, *, user: User, code: str, base_url: str) -> NotificationEvent:
+    verify_url = f"{base_url.rstrip('/')}/login?verifyEmail={quote(user.email)}&verifyCode={quote(code)}"
     event = NotificationEvent(
         event_type="email_verification",
         user_id=user.id,
         channel="email",
         recipient=user.email,
         subject="验证你的酷里邮箱",
-        body=render_template("email_verify.html", {"verify_url": verify_url}),
+        body=render_template("email_verify.html", {"verify_url": verify_url, "verification_code": code}),
         status="pending",
-        idempotency_key=f"email_verification:{user.id}:{token[:12]}",
+        idempotency_key=f"email_verification:{user.id}:{code}",
     )
     db.add(event)
     db.flush()
@@ -236,8 +236,9 @@ def create_register_code_event(db: Session, *, email: str, code: str) -> Notific
     return event
 
 
-def create_password_reset_code_event(db: Session, *, user: User, code: str) -> NotificationEvent:
-    body = f"你的酷里密码重置验证码是 {code}，请在 60 秒内完成验证。如非本人操作请忽略。"
+def create_password_reset_code_event(db: Session, *, user: User, code: str, base_url: str) -> NotificationEvent:
+    reset_url = f"{base_url.rstrip('/')}/login?resetEmail={quote(user.email)}&resetCode={quote(code)}"
+    body = render_template("password_reset.html", {"reset_url": reset_url, "verification_code": code})
     event = NotificationEvent(
         event_type="password_reset_code",
         user_id=user.id,

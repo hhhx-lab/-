@@ -32,12 +32,12 @@
           <div><dt>注册时间</dt><dd>{{ display.date(summary.profile.createdAt) }}</dd></div>
           <div>
             <dt>邮箱验证</dt>
-            <dd>
-              {{ summary.profile.emailVerifiedAt ? "已验证" : "待验证" }}
-              <button v-if="!summary.profile.emailVerifiedAt" class="button secondary inline-button" type="button" :disabled="verificationBusy" @click="requestVerification">
-                {{ verificationBusy ? "发送中" : "发送验证邮件" }}
-              </button>
-            </dd>
+              <dd>
+                {{ summary.profile.emailVerifiedAt ? "已验证" : "待验证" }}
+                <button v-if="!summary.profile.emailVerifiedAt" class="button secondary inline-button" type="button" :disabled="verificationBusy" @click="requestVerification">
+                  {{ verificationBusy ? "发送中" : "发送验证码" }}
+                </button>
+              </dd>
           </div>
         </dl>
         <p v-if="verificationMessage" class="form-success">{{ verificationMessage }}</p>
@@ -112,11 +112,11 @@ onMounted(async () => {
 });
 
 async function requestVerification() {
-  if (!auth.token) return;
+  if (!auth.token || !summary.value) return;
   verificationBusy.value = true;
   verificationMessage.value = "";
   try {
-    const result = await api.requestEmailVerification(auth.token);
+    const result = await api.requestEmailVerification(summary.value.profile.email);
     verificationMessage.value = result.message;
   } finally {
     verificationBusy.value = false;

@@ -50,6 +50,7 @@
           <NuxtLink to="/help?doc=terms">服务条款</NuxtLink>
           <NuxtLink to="/help?doc=upload-policy">上传说明</NuxtLink>
           <NuxtLink to="/help?doc=contact">联系我们</NuxtLink>
+          <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">渝ICP备2026015027号</a>
         </nav>
       </div>
     </footer>

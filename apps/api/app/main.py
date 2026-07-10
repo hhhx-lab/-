@@ -35,7 +35,6 @@ from app.notifications.events import (
     create_order_customer_notification,
     create_order_message_notification,
     create_password_reset_code_event,
-    create_password_reset_event,
     create_register_code_event,
     create_referral_reward_notification,
 )
@@ -72,6 +71,7 @@ from app.schemas.api import (
     PolishOut,
     PaymentInput,
     EmailCodeRequestIn,
+    EmailVerificationConfirmIn,
     PasswordResetConfirmIn,
     PasswordResetRequestIn,
     PresignedUploadEnvelope,
@@ -82,7 +82,6 @@ from app.schemas.api import (
     ServiceOut,
     ServicesOut,
     StatusOut,
-    TokenConfirmIn,
     UserEnvelope,
     UserProfileEnvelope,
     UserProfilePatch,
@@ -92,18 +91,12 @@ from app.schemas.api import (
 )
 from app.security import hash_password, sign_token, verify_password, verify_token
 from app.services.auth_codes import (
+    AUTH_CODE_PURPOSE_EMAIL_VERIFICATION,
     AUTH_CODE_PURPOSE_PASSWORD_RESET,
     AUTH_CODE_PURPOSE_REGISTER,
     find_active_auth_email_code,
     issue_auth_email_code,
     mark_auth_email_code_used,
-)
-from app.services.auth_tokens import (
-    find_active_email_verification_token,
-    find_active_password_reset_token,
-    issue_email_verification_token,
-    issue_password_reset_token,
-    mark_token_used,
 )
 from app.services.automation import ensure_automation_for_order, polish_demand
 from app.services.catalog import SERVICE_CATALOG, catalog_item
@@ -575,6 +568,10 @@ def login(input_data: AuthIn, request: Request, db: Session = Depends(get_db)) -
         record_security_event(db, action="auth.login.locked_attempt", user_id=user.id, email=input_data.email.lower(), ip_address=ip_address)
         db.commit()
         raise HTTPException(status_code=423, detail="登录尝试过多，请稍后再试")
+    if user and not user.email_verified_at:
+        record_security_event(db, action="auth.login.unverified", user_id=user.id, email=input_data.email.lower(), ip_address=ip_address)
+        db.commit()
+        raise HTTPException(status_code=403, detail="邮箱尚未验证，请先完成邮箱验证")
     if not user or not verify_password(input_data.password, user.password_hash):
         record_failed_login(db, user, email=input_data.email.lower(), ip_address=ip_address)
         raise HTTPException(status_code=401, detail="邮箱或密码不正确")
@@ -656,37 +653,44 @@ def me(user: User = Depends(current_user)) -> dict[str, object]:
 
 
 @app.post("/api/auth/email-verification/request", status_code=202, response_model=StatusOut)
-def request_email_verification(
-    request: Request,
-    user: User = Depends(current_user),
-    db: Session = Depends(get_db),
-) -> dict[str, object]:
-    if not user.email_verified_at:
-        ip_address = client_ip(request)
-        token, _ = issue_email_verification_token(db, user=user, ip_address=ip_address)
-        event = create_email_verification_event(db, user=user, token=token, base_url=frontend_base_url(request))
-        record_security_event(
-            db,
-            action="auth.email_verification.requested",
-            user_id=user.id,
-            email=user.email,
-            ip_address=ip_address,
-        )
-        db.commit()
-        enqueue_notification_event(event.id)
-    return {"ok": True, "message": "如果需要验证邮件，酷里已经发出。"}
+def request_email_verification(input_data: EmailCodeRequestIn, request: Request, db: Session = Depends(get_db)) -> dict[str, object]:
+    ip_address = client_ip(request)
+    email = input_data.email.lower().strip()
+    user = db.query(User).filter(User.email.ilike(email)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="邮箱尚未注册，请先注册账号")
+    if user.email_verified_at:
+        return {"ok": True, "message": "邮箱已经验证，无需重复发送"}
+    if not check_auth_code_send_rate_limit(db, ip_address=ip_address, email=email, purpose=AUTH_CODE_PURPOSE_EMAIL_VERIFICATION):
+        raise HTTPException(status_code=429, detail="验证码发送过于频繁，请稍后再试")
+    code = issue_auth_email_code(db, email=email, purpose=AUTH_CODE_PURPOSE_EMAIL_VERIFICATION, ip_address=ip_address)
+    event = create_email_verification_event(db, user=user, code=code, base_url=frontend_base_url(request))
+    record_security_event(
+        db,
+        action="auth.email_verification.requested",
+        user_id=user.id,
+        email=user.email,
+        ip_address=ip_address,
+    )
+    db.commit()
+    enqueue_notification_event(event.id)
+    return {"ok": True, "message": "邮箱验证码已发送，请在 60 秒内完成验证"}
 
 
 @app.post("/api/auth/email-verification/confirm", response_model=StatusOut)
-def confirm_email_verification(input_data: TokenConfirmIn, db: Session = Depends(get_db)) -> dict[str, object]:
-    token_row = find_active_email_verification_token(db, input_data.token)
-    if not token_row:
-        raise HTTPException(status_code=400, detail="验证 token 无效或已过期")
-    user = db.get(User, token_row.user_id)
+def confirm_email_verification(input_data: EmailVerificationConfirmIn, db: Session = Depends(get_db)) -> dict[str, object]:
+    email = input_data.email.lower().strip()
+    user = db.query(User).filter(User.email.ilike(email)).first()
     if not user:
-        raise HTTPException(status_code=400, detail="验证 token 无效或已过期")
+        raise HTTPException(status_code=400, detail="验证码无效或已过期")
+    code_row = find_active_auth_email_code(db, email=email, purpose=AUTH_CODE_PURPOSE_EMAIL_VERIFICATION, code=input_data.verificationCode)
+    if not code_row:
+        record_security_event(db, action="auth.email_verification.invalid_code", user_id=user.id, email=user.email)
+        db.commit()
+        raise HTTPException(status_code=400, detail="验证码无效或已过期，请重新获取")
+    mark_auth_email_code_used(code_row)
+    db.add(code_row)
     user.email_verified_at = user.email_verified_at or now_iso()
-    mark_token_used(token_row)
     record_security_event(db, action="auth.email_verification.confirmed", user_id=user.id, email=user.email)
     db.commit()
     return {"ok": True, "message": "邮箱已验证"}
@@ -701,7 +705,7 @@ def request_password_reset(input_data: PasswordResetRequestIn, request: Request,
         if not check_auth_code_send_rate_limit(db, ip_address=ip_address, email=email, purpose=AUTH_CODE_PURPOSE_PASSWORD_RESET):
             raise HTTPException(status_code=429, detail="验证码发送过于频繁，请稍后再试")
         code = issue_auth_email_code(db, email=email, purpose=AUTH_CODE_PURPOSE_PASSWORD_RESET, ip_address=ip_address)
-        event = create_password_reset_code_event(db, user=user, code=code)
+        event = create_password_reset_code_event(db, user=user, code=code, base_url=frontend_base_url(request))
         record_security_event(
             db,
             action="auth.password_reset.code_sent",

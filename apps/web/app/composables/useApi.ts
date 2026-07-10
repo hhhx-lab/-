@@ -98,9 +98,9 @@ export function useApi() {
     register: (input: { email: string; password: string; displayName: string; verificationCode: string; referralCode?: string }) =>
       request<ApiResponse<"/api/auth/register", "post">>("/api/auth/register", { method: "POST", body: JSON.stringify(input) }),
     me: (token: string) => request<ApiResponse<"/api/auth/me", "get">>("/api/auth/me", { token }),
-    requestEmailVerification: (token: string) =>
-      request<{ ok: boolean; message: string }>("/api/auth/email-verification/request", { method: "POST", token }),
-    confirmEmailVerification: (input: { token: string }) =>
+    requestEmailVerification: (email: string) =>
+      request<{ ok: boolean; message: string }>("/api/auth/email-verification/request", { method: "POST", body: JSON.stringify({ email }) }),
+    confirmEmailVerification: (input: { email: string; verificationCode: string }) =>
       request<{ ok: boolean; message: string }>("/api/auth/email-verification/confirm", { method: "POST", body: JSON.stringify(input) }),
     requestPasswordReset: (email: string) =>
       request<{ ok: boolean; message: string }>("/api/auth/password-reset/request", { method: "POST", body: JSON.stringify({ email }) }),

@@ -8,6 +8,7 @@
 
       <template v-if="mode === 'login'">
         <label>邮箱<input v-model="email" autocomplete="email" /></label>
+        <label v-if="verificationCode">邮箱验证码<input v-model="verificationCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="6 位数字，60 秒内有效" /></label>
         <div class="field">
           <label for="login-password">密码</label>
           <span class="password-field">
@@ -230,7 +231,18 @@ const redirectPath = computed(() => {
 
 onMounted(async () => {
   await auth.restore();
-  if (route.query.verifyToken) await confirmVerification(String(route.query.verifyToken));
+  if (route.query.verifyEmail && route.query.verifyCode) {
+    email.value = String(route.query.verifyEmail);
+    verificationCode.value = String(route.query.verifyCode);
+    await confirmVerification(email.value, verificationCode.value);
+    mode.value = "login";
+  }
+  if (route.query.resetEmail && route.query.resetCode) {
+    mode.value = "reset";
+    resetEmail.value = String(route.query.resetEmail);
+    resetVerificationCode.value = String(route.query.resetCode);
+    email.value = resetEmail.value;
+  }
   if (auth.user) await router.replace(redirectPath.value);
 });
 
@@ -405,10 +417,10 @@ async function navigateAfterAuth() {
   await router.replace(redirectPath.value);
 }
 
-async function confirmVerification(token: string) {
+async function confirmVerification(targetEmail: string, code: string) {
   error.value = "";
   try {
-    const result = await api.confirmEmailVerification({ token });
+    const result = await api.confirmEmailVerification({ email: targetEmail, verificationCode: code });
     notice.value = result.message;
   } catch (caught) {
     error.value = caught instanceof ApiError ? caught.message : "邮箱验证失败，请重新发送验证邮件";

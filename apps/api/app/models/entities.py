@@ -442,6 +442,7 @@ def seed_database(db: Session, *, include_demo_data: bool = True) -> None:
                     role="admin",
                     display_name="酷里管理员",
                     referral_code="ADMINDEMO",
+                    email_verified_at=now_iso(),
                 ),
                 User(
                     id="user_demo",
@@ -450,6 +451,7 @@ def seed_database(db: Session, *, include_demo_data: bool = True) -> None:
                     role="user",
                     display_name="Demo 用户",
                     referral_code="DEMOKULI",
+                    email_verified_at=now_iso(),
                 ),
                 User(
                     id="user_other",
@@ -458,6 +460,7 @@ def seed_database(db: Session, *, include_demo_data: bool = True) -> None:
                     role="user",
                     display_name="Other 用户",
                     referral_code="OTHERKULI",
+                    email_verified_at=now_iso(),
                 ),
             ]
         )

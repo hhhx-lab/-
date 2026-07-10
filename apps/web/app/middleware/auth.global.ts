@@ -1,29 +1,27 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-  const path = to.path;
-  const protectedPrefixes = ["/orders", "/pay", "/me", "/settings", "/referrals", "/notifications"];
-  const isProtected = protectedPrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
-  const isAdmin = path === "/admin" || path.startsWith("/admin/");
   const auth = useAuthStore();
+  const publicPaths = new Set(["/", "/login"]);
+  const isPublic = publicPaths.has(to.path);
 
   if (import.meta.server) {
     const tokenCookie = useCookie<string | null>("kuli-v2-token");
     if (tokenCookie.value) await auth.restore();
-    if ((isProtected || isAdmin) && !auth.user) {
+    if (!isPublic && !auth.user) {
       return navigateTo({ path: "/login", query: { redirect: to.fullPath } });
     }
-    if (isAdmin && auth.user?.role !== "admin") {
-      return navigateTo("/orders");
+    if (to.path === "/login" && auth.user) {
+      return navigateTo("/");
     }
     return;
   }
 
   if (!auth.ready) await auth.restore();
 
-  if ((isProtected || isAdmin) && !auth.user) {
+  if (!isPublic && !auth.user) {
     return navigateTo({ path: "/login", query: { redirect: to.fullPath } });
   }
 
-  if (isAdmin && auth.user?.role !== "admin") {
-    return navigateTo("/orders");
+  if (to.path === "/login" && auth.user) {
+    return navigateTo("/");
   }
 });

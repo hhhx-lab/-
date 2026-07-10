@@ -18,6 +18,9 @@ rsync -az --delete \
   --exclude='apps/api/data/' \
   --exclude='apps/api/__pycache__/' \
   --exclude='scripts/__pycache__/' \
+  --exclude='.playwright-cli/' \
+  --exclude='scripts/verify_guest_access.mjs' \
+  --exclude='前端图片/' \
   --exclude='.env' \
   --exclude='apps/api/.env' \
   --exclude='apps/web/.env' \

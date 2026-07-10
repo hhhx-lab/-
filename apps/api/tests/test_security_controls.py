@@ -6,16 +6,16 @@ import pytest
 from sqlalchemy import text
 
 from app import database
+from app.core.config import get_settings
 from app.database import configure_database, init_database
 from app.main import app
 from app.models.entities import User
 from tests.auth_helpers import (
     code_from_event_body,
-    confirm_password_reset_with_code,
     latest_email_event,
     register_user,
+    request_email_verification_code,
     request_password_reset_code,
-    token_from_event_body,
 )
 
 
@@ -31,6 +31,20 @@ async def client(tmp_path: Path) -> AsyncIterator[httpx.AsyncClient]:
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
+
+
+@pytest.fixture(autouse=True)
+def reset_mail_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MAIL_PROVIDER", "")
+    monkeypatch.setenv("MAIL_FROM", "")
+    monkeypatch.setenv("MAIL_REPLY_TO", "")
+    monkeypatch.setenv("SMTP_HOST", "")
+    monkeypatch.setenv("SMTP_PORT", "587")
+    monkeypatch.setenv("SMTP_USERNAME", "")
+    monkeypatch.setenv("SMTP_PASSWORD", "")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def security_actions() -> list[str]:
@@ -85,6 +99,22 @@ async def test_failed_login_locks_account_without_revealing_email_existence(clie
 
 
 @pytest.mark.anyio
+async def test_login_rejects_unverified_accounts(client: httpx.AsyncClient) -> None:
+    with database.SessionLocal() as db:
+        user = db.query(User).filter(User.email == "demo@kuli.local").first()
+        assert user is not None
+        user.email_verified_at = None
+        db.commit()
+
+    response = await client.post("/api/auth/login", json={"email": "demo@kuli.local", "password": "KuliUser123!"})
+    assert response.status_code == 403
+    assert "邮箱尚未验证" in response.json()["detail"]
+
+    actions = security_actions()
+    assert "auth.login.unverified" in actions
+
+
+@pytest.mark.anyio
 async def test_registration_and_agent_chat_are_rate_limited_per_ip_or_visitor(client: httpx.AsyncClient) -> None:
     for index in range(2):
         created = await register_user(
@@ -121,12 +151,18 @@ async def test_registration_and_agent_chat_are_rate_limited_per_ip_or_visitor(cl
 
 
 @pytest.mark.anyio
-async def test_email_verification_request_and_confirm_updates_current_user(client: httpx.AsyncClient) -> None:
-    login = await client.post("/api/auth/login", json={"email": "demo@kuli.local", "password": "KuliUser123!"})
-    assert login.status_code == 200
-    token = login.json()["token"]
+async def test_email_verification_request_and_confirm_works_without_current_session(client: httpx.AsyncClient) -> None:
+    with database.SessionLocal() as db:
+        user = db.query(User).filter(User.email == "demo@kuli.local").first()
+        assert user is not None
+        user.email_verified_at = None
+        db.commit()
 
-    request = await client.post("/api/auth/email-verification/request", headers={"Authorization": f"Bearer {token}"})
+    blocked_login = await client.post("/api/auth/login", json={"email": "demo@kuli.local", "password": "KuliUser123!"})
+    assert blocked_login.status_code == 403
+    assert "邮箱尚未验证" in blocked_login.json()["detail"]
+
+    request = await request_email_verification_code(client, "demo@kuli.local")
     assert request.status_code == 202
     assert request.json()["ok"] is True
 
@@ -134,20 +170,23 @@ async def test_email_verification_request_and_confirm_updates_current_user(clien
     assert event["status"] == "pending"
     assert "验证" in str(event["subject"])
 
-    verify_token = token_from_event_body(str(event["body"]))
-    confirm = await client.post("/api/auth/email-verification/confirm", json={"token": verify_token})
+    confirm = await client.post(
+        "/api/auth/email-verification/confirm",
+        json={"email": "demo@kuli.local", "verificationCode": code_from_event_body(str(event["body"]))},
+    )
     assert confirm.status_code == 200
     assert confirm.json()["ok"] is True
 
-    profile = await client.get("/api/me/profile", headers={"Authorization": f"Bearer {token}"})
-    assert profile.status_code == 200
-    assert profile.json()["profile"]["emailVerifiedAt"]
+    login = await client.post("/api/auth/login", json={"email": "demo@kuli.local", "password": "KuliUser123!"})
+    assert login.status_code == 200
 
-    reused = await client.post("/api/auth/email-verification/confirm", json={"token": verify_token})
-    assert reused.status_code == 400
-    assert "无效" in reused.json()["detail"]
+    with database.SessionLocal() as db:
+        refreshed = db.query(User).filter(User.email == "demo@kuli.local").first()
+        assert refreshed is not None
+        assert refreshed.email_verified_at
 
     actions = security_actions()
+    assert "auth.login.unverified" in actions
     assert "auth.email_verification.requested" in actions
     assert "auth.email_verification.confirmed" in actions
 

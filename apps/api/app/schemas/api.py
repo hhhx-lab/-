@@ -33,8 +33,9 @@ class StatusOut(BaseModel):
     message: str
 
 
-class TokenConfirmIn(BaseModel):
-    token: str = Field(min_length=16, max_length=512)
+class EmailVerificationConfirmIn(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    verificationCode: str = Field(min_length=6, max_length=6)
 
 
 class PasswordResetRequestIn(BaseModel):
